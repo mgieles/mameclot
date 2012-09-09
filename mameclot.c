@@ -63,9 +63,9 @@ void parameter_use()
   fprintf(stderr,"          -a Osipkov-Merritt anisotropy radius in units of r_0 [999] \n");
   fprintf(stderr,"          -r Physical scale in pc [1] \n");
   fprintf(stderr,"          -d distance between 2 clusters in N-body units [20] \n");
-  fprintf(stderr,"          -E Dimensionless orbital energy of two-cluster system [4] \n");
-  fprintf(stderr,"          -L Dimensionless orbital angular momentum two-cluster system [0]\n");  
-  fprintf(stderr,"             <0 or >Lhat(circ): forces a circular orbit\n");  
+  fprintf(stderr,"          -E Dimensionless orbital energy of two-cluster system [0] \n");
+  fprintf(stderr,"          -L Dimensionless orbital angular momentum two-cluster system [4]\n");  
+  fprintf(stderr,"             <0 : forces a circular orbit\n");  
   fprintf(stderr,"          -s Random seed [0=from clock] \n\n");
   fprintf(stderr," Example 1: Isochrone sphere with a Kroupa mass function and Osipkov-Merrit \n");
   fprintf(stderr,"            anisotropy radius equal to half-mass radius:\n");

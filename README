@@ -46,9 +46,9 @@
           -a Osipkov-Merritt anisotropy radius in units of r_0 [999] 
           -r Physical scale in pc [1] 
           -d distance between 2 clusters in N-body units [20] 
-          -E Dimensionless orbital energy of two-cluster system [4] 
-          -L Dimensionless orbital angular momentum two-cluster system [0]
-             <0 or >Lhat(circ): forces a circular orbit
+          -E Dimensionless orbital energy of two-cluster system [0] 
+          -L Dimensionless orbital angular momentum two-cluster system [4]
+             <0 : forces a circular orbit
           -s Random seed [0=from clock] 
 
  Example 1: Isochrone sphere with a Kroupa mass function and Osipkov-Merrit 
