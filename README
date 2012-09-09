@@ -1,23 +1,61 @@
 
-MAMECLOT: MAke ME a CLuster Or Two 
+ MAMECLOT: MAke ME a CLuster Or Two
+ 
+ Construct initial conditions for a system of 1 or 2 clusters
 
-Author: Mark Gieles 
+ A 2 cluster system with orbit in the x-y plane is made if the mass ratio q>0 
+ Five equilibrium models are available, positions are sampled up to 20r_h 
+ The velocities can be isotropic or radially anisotropic (a la Osipkov-Merritt)
+ Optional angular momentum by aligning the angular momentum vectors along z
+ System is scaled to N-body units with G = M = -4E = 1 (Heggie & Mathieu 1986)
+ In the case of a two-body system E = E_orb + E_1 + E_2 
+ The 2-body orbit is computed from input q, Ehat and Lhat (and eta if 0<q<1):
+        Ehat = E_orb/0.5<sigma^2> 
+        Lhat = L_orb/<r_vir*sigma>
+        eta => defines the relative radii: r2/r1 = q^eta, for example:
+               eta=[-0.33/0/0.33/0.5] for equal [t_rh/r_h/rho_h/Sigma_h]
 
-This code generates initital conditions for a system of 1 or 2 cluster
+ Mass, pos[3], vel[3] are written to standard output
+ System diagnostics are written to the standard error
 
-Compile:
+ Usage: mameclot [OPTIONS] 
 
-make
+ Options: 
+          -N Total number of stars [10000]
+          -m Cluster model [3]
+             0: Dehnen (1993): gamma=0            =>     core, -4 halo
+             1: Hernquist (1990)                  =>  -1 cusp, -4 halo
+             2: Jaffe (1983)                      =>  -2 cusp, -4 halo
+             3: Henon (1959) "Isochrone" sphere   =>     core, -4 halo
+             4: Plummer (1911)                    =>     core, -5 halo
+          -q Mass ratio of the two clusters (q=m2/m1) [0] 
+             0: Make 1 cluster
+             0<q<=1: Make 2 clusters
+          -e (eta) relative cluster sizes: r2/r1 = q^eta [0.333] 
+          -i IMF [0] 
+             0: single mass
+             1: Kroupa (2001) between 0.1 Msun and 100 Msun
+          -l Angular momentum (am) in z-direction for individual clusters [0] 
+             0: No am 
+             1: Positive am
+             2: cluster 1 positive am, cluster 2 no am
+             3: cluster 1 positive am, cluster 2 negative am
+             -1: Negative am
+             -2: clusters 1 negative am, cluster 2 no am
+             -3: clusters 1 negative am, cluster 2 positive am
+          -a Osipkov-Merritt anisotropy radius in units of r_0 [999] 
+          -r Physical scale in pc [1] 
+          -d distance between 2 clusters in N-body units [20] 
+          -E Dimensionless orbital energy of two-cluster system [4] 
+          -L Dimensionless orbital angular momentum two-cluster system [0]
+             <0 or >Lhat(circ): forces a circular orbit
+          -s Random seed [0=from clock] 
 
-This create the executable mameclot
+ Example 1: Isochrone sphere with a Kroupa mass function and Osipkov-Merrit 
+            anisotropy radius equal to half-mass radius:
+            (./mameclot -m 3 -a 3.06 -i 1 > snap.tab)2> diag.txt
 
-For CUDA enabled GPU support compile as
+ Example 2: Two Hernquist models with isotropic velocity distribution on a 
+            circular orbit and a mass ratio of 1/3:
+            (./mameclot -m 1 -q 0.333 -L -1 > snap.tab)2> diag.txt
 
-make gpu
-
-This creates the executable mameclot.gpu for fast energy scaling on a GPU 
-Perhaps necessary to change the paths of cuda and cuda libs in the Makefile
-
-For help run:
-
-./mameclot -h
