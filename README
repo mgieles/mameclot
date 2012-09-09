@@ -1,7 +1,7 @@
 
  MAMECLOT: MAke ME a CLuster Or Two
 
- Construct initial conditions for a system of 1 (or 2) cluster(s)
+ Construct initial conditions of 1 (or 2) cluster(s) for N-body simulation 
 
  A 2 cluster system with orbit in the x-y plane is made if the mass ratio q>0 
  Five equilibrium models are available, positions are sampled up to 20r_h 
