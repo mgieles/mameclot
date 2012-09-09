@@ -21,7 +21,8 @@
 /*************************************************/
 void parameter_use()
 {
-  fprintf(stderr,"\n Construct initial conditions for a system of 1 or 2 clusters\n\n");
+  fprintf(stderr,"\n MAMECLOT: MAke ME a CLuster Or Two\n\n");
+  fprintf(stderr," Construct initial conditions for a system of 1 (or 2) cluster(s)\n\n");
   fprintf(stderr," A 2 cluster system with orbit in the x-y plane is made if the mass ratio q>0 \n");
   fprintf(stderr," Five equilibrium models are available, positions are sampled up to 20r_h \n");
   fprintf(stderr," The velocities can be isotropic or radially anisotropic (a la Osipkov-Merritt)\n");
