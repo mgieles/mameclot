@@ -472,7 +472,6 @@ void set_scalings(CLUSTER *cluster)
 /*************************************************/
 void imf(CLUSTER *cluster)
 {
-  // Assign masses according to a Kroupa mass function
   int i, nrem;
   double zm, m, mrem, mtot;
   double c[12], mass[cluster->N];
@@ -541,7 +540,6 @@ void imf(CLUSTER *cluster)
       }      
     }
 }
-
 
 /*************************************************/
 void get_pos_vel(CLUSTER *cluster)
@@ -738,8 +736,10 @@ void get_osipkov_merrit_v_eta(double r, double ra, int model, double *v, double 
 {
   // Sample velocity and angle eta needed for the anisotropic 
   // Osipkov-Merritt distribution function DF(Q), where
-  //      Q = E - 0.5*J2/ra2 = 0.5*(vesc2 - v2 - vt2sin(eta)^2/ra2)
-  
+  //      Q = E - 0.5*J2/ra2 = 0.5*(vesc2 - v2 - vt2*sin(eta)^2/ra2)
+  //
+  // Introduce velocity relative to escape velcoity: q = v/v_esc
+
   double v2, vesc2, q, qt, qt2, q2, PQ, Q, Q2, df, f1, f2;
     
   double r2 = sqr(r);
