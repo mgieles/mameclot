@@ -11,6 +11,7 @@ typedef struct input{
   int gamma;
   unsigned int seed;
   double q;
+  double rcut;
   double rbar;
   double eta; // r_2/r_1 = q^eta
   double d;
@@ -40,6 +41,7 @@ typedef struct cluster{
   float K;
   double vrms; 
   double rvir; 
+  double rcut; 
   double M; 
   double mmean; //Msun
   double trh; 
