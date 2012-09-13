@@ -22,14 +22,14 @@
 void parameter_use()
 {
   fprintf(stderr,"\n MAMECLOT: MAke ME a CLuster Or Two\n\n");
-  fprintf(stderr," Construct initial conditions of 1 (or 2) cluster(s) for N-body simulation \n\n");
+  fprintf(stderr," Construct initial conditions of 1 (or 2) cluster(s) for N-body simulations \n\n");
   fprintf(stderr," A 2 cluster system with orbit in the x-y plane is made if the mass ratio q>0 \n");
   fprintf(stderr," Five equilibrium models are available, a cut-off radius can be provided\n");
   fprintf(stderr," The velocities can be isotropic or radially anisotropic (a la Osipkov-Merritt)\n");
   fprintf(stderr," Optional angular momentum by aligning the angular momentum vectors along z\n");
   fprintf(stderr," System is scaled to N-body units with G = M = -4E = 1 (Heggie & Mathieu 1986)\n");
   fprintf(stderr," In the case of a two-body system E = E_orb + E_1 + E_2 \n");
-  fprintf(stderr," The 2-body orbit is computed from input q, Ehat and Lhat (and eta if 0<q<1):\n");
+  fprintf(stderr," The 2-body orbit is computed from input q, Ehat and Lhat (and eta if 0<q<=1):\n");
   fprintf(stderr,"        Ehat = E_orb/0.5<sigma^2> \n");
   fprintf(stderr,"        Lhat = L_orb/<r_vir*sigma>\n");
   fprintf(stderr,"        eta => defines the relative radii: r2/r1 = q^eta, for example:\n");

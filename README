@@ -1,7 +1,7 @@
 
  MAMECLOT: MAke ME a CLuster Or Two
 
- Construct initial conditions of 1 (or 2) cluster(s) for N-body simulation 
+ Construct initial conditions of 1 (or 2) cluster(s) for N-body simulations 
 
  A 2 cluster system with orbit in the x-y plane is made if the mass ratio q>0 
  Five equilibrium models are available, a cut-off radius can be provided
@@ -9,7 +9,7 @@
  Optional angular momentum by aligning the angular momentum vectors along z
  System is scaled to N-body units with G = M = -4E = 1 (Heggie & Mathieu 1986)
  In the case of a two-body system E = E_orb + E_1 + E_2 
- The 2-body orbit is computed from input q, Ehat and Lhat (and eta if 0<q<1):
+ The 2-body orbit is computed from input q, Ehat and Lhat (and eta if 0<q<=1):
         Ehat = E_orb/0.5<sigma^2> 
         Lhat = L_orb/<r_vir*sigma>
         eta => defines the relative radii: r2/r1 = q^eta, for example:
