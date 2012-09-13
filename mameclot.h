@@ -38,6 +38,7 @@ typedef struct cluster{
   float rh_over_rv;
   float rmax_over_r0;
   float W;
+  float Lz;
   float K;
   double vrms; 
   double rvir; 
