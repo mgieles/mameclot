@@ -4,7 +4,7 @@
  Construct initial conditions of 1 (or 2) cluster(s) for N-body simulation 
 
  A 2 cluster system with orbit in the x-y plane is made if the mass ratio q>0 
- Five equilibrium models are available, positions are sampled up to 20r_h 
+ Five equilibrium models are available, a cut-off radius can be provided
  The velocities can be isotropic or radially anisotropic (a la Osipkov-Merritt)
  Optional angular momentum by aligning the angular momentum vectors along z
  System is scaled to N-body units with G = M = -4E = 1 (Heggie & Mathieu 1986)
@@ -44,6 +44,7 @@
              -2: clusters 1 negative am, cluster 2 no am
              -3: clusters 1 negative am, cluster 2 positive am
           -a Osipkov-Merritt anisotropy radius in units of r_0 [999] 
+          -c Cut-off radius in units of r_h [20] 
           -r Physical scale in pc [1] 
           -d distance between 2 clusters in N-body units [20] 
           -E Dimensionless orbital energy of two-cluster system [0] 
