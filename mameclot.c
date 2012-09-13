@@ -24,7 +24,7 @@ void parameter_use()
   fprintf(stderr,"\n MAMECLOT: MAke ME a CLuster Or Two\n\n");
   fprintf(stderr," Construct initial conditions of 1 (or 2) cluster(s) for N-body simulation \n\n");
   fprintf(stderr," A 2 cluster system with orbit in the x-y plane is made if the mass ratio q>0 \n");
-  fprintf(stderr," Five equilibrium models are available, positions are sampled up to 20r_h \n");
+  fprintf(stderr," Five equilibrium models are available, a cut-off radius can be provided\n");
   fprintf(stderr," The velocities can be isotropic or radially anisotropic (a la Osipkov-Merritt)\n");
   fprintf(stderr," Optional angular momentum by aligning the angular momentum vectors along z\n");
   fprintf(stderr," System is scaled to N-body units with G = M = -4E = 1 (Heggie & Mathieu 1986)\n");
@@ -61,6 +61,7 @@ void parameter_use()
   fprintf(stderr,"             -2: clusters 1 negative am, cluster 2 no am\n");
   fprintf(stderr,"             -3: clusters 1 negative am, cluster 2 positive am\n");
   fprintf(stderr,"          -a Osipkov-Merritt anisotropy radius in units of r_0 [999] \n");
+  fprintf(stderr,"          -c Cut-off radius in units of r_h [20] \n");
   fprintf(stderr,"          -r Physical scale in pc [1] \n");
   fprintf(stderr,"          -d distance between 2 clusters in N-body units [20] \n");
   fprintf(stderr,"          -E Dimensionless orbital energy of two-cluster system [0] \n");
@@ -103,6 +104,14 @@ void parameter_check(INPUT *parameters){
   if ((parameters->q < 0)||(parameters->q>1)){
     fprintf(stderr," *** \n");
     fprintf(stderr," *** Input error: q must be between 0 and 1 \n");
+    fprintf(stderr," *** \n");
+    exit (0);
+  }
+
+  // Check rcut
+  if (parameters->rcut < 5){
+    fprintf(stderr," *** \n");
+    fprintf(stderr," *** Input error: cut-off radius must be larger than 5r_h \n");
     fprintf(stderr," *** \n");
     exit (0);
   }
@@ -169,6 +178,7 @@ void get_args(int argc, char** argv, INPUT *parameters)
   parameters->q       = 0;  
   parameters->eta     = 0.333;  
   parameters->d       = 20;  
+  parameters->rcut    = 20;  
   parameters->Ehat    = 0;  
   parameters->Lhat    = 4;  
   
@@ -183,6 +193,8 @@ void get_args(int argc, char** argv, INPUT *parameters)
       case 'N': parameters->N = atoi(argv[++i]);
 	break;
       case 'q': parameters->q = atof(argv[++i]);
+	break;
+      case 'c': parameters->rcut = atof(argv[++i]);
 	break;
       case 'd': parameters->d = atof(argv[++i]);
 	break;
@@ -245,6 +257,7 @@ void initialize(SYSTEM **system, INPUT parameters)
   (*system)->clusters[0].M = 1.0;
   (*system)->clusters[0].imftype = parameters.imftype;
   (*system)->clusters[0].rvir = 1.0;
+  (*system)->clusters[0].rcut = parameters.rcut;
   (*system)->clusters[0].ra = parameters.ra;
   (*system)->clusters[0].vrms = 1.0/sqrt(2.0);
   (*system)->clusters[0].model = parameters.model;
@@ -365,6 +378,7 @@ void initialize(SYSTEM **system, INPUT parameters)
       (*system)->clusters[1].model = parameters.model;
       (*system)->clusters[1].gamma = parameters.gamma;
       (*system)->clusters[1].ra = parameters.ra;
+      (*system)->clusters[1].rcut = parameters.rcut;
       if (fabs(parameters.spin)==1)
 	(*system)->clusters[1].spin = sign(parameters.spin);
       if (fabs(parameters.spin)==3)
@@ -450,10 +464,10 @@ void set_scalings(CLUSTER *cluster)
       break;
     }
   cluster->rh_over_rv = cluster->rh_over_r0/cluster->rv_over_r0;
-  cluster->rmax_over_r0 = 20.0*cluster->rh_over_r0;
+  cluster->rmax_over_r0 = cluster->rcut*cluster->rh_over_r0;
 
   // Calculate cluster relaxation time 
-  double gamma;
+  double gamma = 0.11;
   switch (cluster->imftype)
     {
     case (0):
@@ -1007,21 +1021,23 @@ void output(SYSTEM *system)
   for (int i=0; i<system->Ncl; i++)
     {
       cluster = &system->clusters[i];  
-      fprintf(stderr,"\n  CLUSTER %i   = %7s   => rv/r0=%5.3f; rh/r0=%5.3f; rh/rv=%5.3f\n",i+1, 
-	      cluster->name,cluster->rv_over_r0,cluster->rh_over_r0,cluster->rh_over_rv);
-      fprintf(stderr,"   N          = %11i \n",cluster->N); 
-      fprintf(stderr,"   M          = %11.3f / %11.3f Msun\n",cluster->M,cluster->M * system->mstar);
-      fprintf(stderr,"   r_vir      = %11.3f / %11.3f pc \n",cluster->rvir, cluster->rvir * system->rstar);
-      fprintf(stderr,"   r_h        = %11.3f / %11.3f pc \n",
+      fprintf(stderr," #%i: %7s: rv/r0=%5.3f; rh/r0=%5.3f; rh/rv=%5.3f; rcut/rh=%3.1f; ra/r0=%3.1f\n",i+1, 
+	      cluster->name,cluster->rv_over_r0,cluster->rh_over_r0,cluster->rh_over_rv,
+	      cluster->rcut,cluster->ra);
+	      
+      fprintf(stderr,"     N          = %11i \n",cluster->N); 
+      fprintf(stderr,"     M          = %11.3f / %11.3f Msun\n",cluster->M,cluster->M * system->mstar);
+      fprintf(stderr,"     r_vir      = %11.3f / %11.3f pc \n",cluster->rvir, cluster->rvir * system->rstar);
+      fprintf(stderr,"     r_h        = %11.3f / %11.3f pc \n",
 	      cluster->rvir*cluster->rh_over_rv, cluster->rvir * cluster->rh_over_rv *system->rstar);
-      fprintf(stderr,"   spin       = %11i \n",cluster->spin);
-      fprintf(stderr,"   r_a (OM)   = %11.3f \n",cluster->ra);
-      fprintf(stderr,"   vrms       = %11.3f / %11.3f km s-1\n",cluster->vrms, cluster->vrms * system->vstar);
-      fprintf(stderr,"   vrms1D     = %11.3f / %11.3f km s-1\n",cluster->vrms/sqrt(3.0), 
+      fprintf(stderr,"     spin       = %11i \n",cluster->spin);
+      fprintf(stderr,"     r_a (OM)   = %11.3f \n",cluster->ra);
+      fprintf(stderr,"     vrms       = %11.3f / %11.3f km s-1\n",cluster->vrms, cluster->vrms * system->vstar);
+      fprintf(stderr,"     vrms1D     = %11.3f / %11.3f km s-1\n",cluster->vrms/sqrt(3.0), 
 	      cluster->vrms * system->vstar/sqrt(3.0));
-      fprintf(stderr,"   trh        = %11.3f / %11.3f Myr\n",cluster->trh, cluster->trh * system->tstar);
-      fprintf(stderr,"   E          = %11.3f \n",cluster->K+cluster->W); 
-      fprintf(stderr,"   W          = %11.3f \n",cluster->W); 
+      fprintf(stderr,"     trh        = %11.3f / %11.3f Myr\n",cluster->trh, cluster->trh * system->tstar);
+      fprintf(stderr,"     E          = %11.3f \n",cluster->K+cluster->W); 
+      fprintf(stderr,"     W          = %11.3f \n",cluster->W); 
     }
 
   if (system->Ncl == 2)
