@@ -52,14 +52,16 @@ void parameter_use()
   fprintf(stderr,"          -i IMF [0] \n");
   fprintf(stderr,"             0: single mass\n");
   fprintf(stderr,"             1: Kroupa (2001) between 0.1 Msun and 100 Msun\n");
-  fprintf(stderr,"          -l Angular momentum (am) in z-direction for individual clusters [0] \n");
-  fprintf(stderr,"             0: No am \n");
-  fprintf(stderr,"             1: Positive am\n");
-  fprintf(stderr,"             2: cluster 1 positive am, cluster 2 no am\n");
-  fprintf(stderr,"             3: cluster 1 positive am, cluster 2 negative am\n");
-  fprintf(stderr,"             -1: Negative am\n");
-  fprintf(stderr,"             -2: clusters 1 negative am, cluster 2 no am\n");
-  fprintf(stderr,"             -3: clusters 1 negative am, cluster 2 positive am\n");
+  fprintf(stderr,"          -l Angular momentum in z-direction, -, + or x [0] \n");
+  fprintf(stderr,"              0: xx (both none)\n");
+  fprintf(stderr,"              1: ++ (both positive)\n");
+  fprintf(stderr,"              2: +x \n");
+  fprintf(stderr,"              3: +- \n");
+  fprintf(stderr,"              4: x+ \n");
+  fprintf(stderr,"              5: x- \n");
+  fprintf(stderr,"             -1: -- (both negative)\n");
+  fprintf(stderr,"             -2: -x \n");
+  fprintf(stderr,"             -3: -+ \n");
   fprintf(stderr,"          -a Osipkov-Merritt anisotropy radius in units of r_0 [999] \n");
   fprintf(stderr,"          -c Cut-off radius in units of r_h [20] \n");
   fprintf(stderr,"          -r Physical scale in pc [1] \n");
@@ -266,6 +268,8 @@ void initialize(SYSTEM **system, INPUT parameters)
 
   if ((fabs(parameters.spin)>=1)&&(fabs(parameters.spin)<=3))
     (*system)->clusters[0].spin = sign(parameters.spin);
+  if (parameters.spin>=4)
+    (*system)->clusters[0].spin = 0;
 
   double q = parameters.q;  
   if (q > 0)
@@ -303,7 +307,6 @@ void initialize(SYSTEM **system, INPUT parameters)
 	  // Mean sig2 follows from:       E =     mu*E_orb + E1 + E2
 	  //                        => -0.25 = -0.5mu*vrel2 -0.5<sig2>
 	  msig2 = 0.5 - mu*sqr(vrel); 
-	  //	  fprintf(stderr," TESt 1 %10.5f \n",msig2);
 	  Ehat = -sqr(vrel)/msig2;	  
 	  Lhat = 4.0/sqrt(-Ehat) * sqr(f)/(2.0*g) *sqrt(f/h);
 
@@ -356,8 +359,7 @@ void initialize(SYSTEM **system, INPUT parameters)
       if (vrel > 0)
 	b = Lhat*mrsig/vrel;
 
-      // Could add the angular momentum of the individual clumps here.
-      double lambda = (mu*Lhat*mrsig)*sqrt(0.25);
+      double lambda_orb = (mu*Lhat*mrsig)*sqrt(0.25);
       
       double dx = 0.0;
       double acc = 0.0;
@@ -379,9 +381,10 @@ void initialize(SYSTEM **system, INPUT parameters)
       (*system)->clusters[1].gamma = parameters.gamma;
       (*system)->clusters[1].ra = parameters.ra;
       (*system)->clusters[1].rcut = parameters.rcut;
-      if (fabs(parameters.spin)==1)
+
+      if ((fabs(parameters.spin)==1)||(parameters.spin==4))
 	(*system)->clusters[1].spin = sign(parameters.spin);
-      if (fabs(parameters.spin)==3)
+      if ((fabs(parameters.spin)==3)||(parameters.spin==5))
 	(*system)->clusters[1].spin = -1.0*sign(parameters.spin);
 
       strcpy((*system)->clusters[1].name, parameters.name);
@@ -397,7 +400,8 @@ void initialize(SYSTEM **system, INPUT parameters)
       (*system)->tenc = tenc;
       (*system)->Ehat = Ehat;
       (*system)->Lhat = Lhat;
-      (*system)->lambda = lambda;
+
+      (*system)->lambda_orb = lambda_orb;
       
       (*system)->clusters[0].vrms = sig1;
       (*system)->clusters[1].vrms = sig2;
@@ -422,14 +426,17 @@ void create(SYSTEM **system)
     get_pos_vel(cluster);
     scale(cluster); 
   }
+  // Add orbital motion and compute total angular momentum
+  if ((*system)->Ncl == 2){
+    twobody_orbit((*system));
+    (*system)->Lz = Lz((*system)); 
+    (*system)->lambda = (*system)->Lz*sqrt(0.25);
+  }
   // Set physical scaling
   (*system)->mstar = (*system)->N * (*system)->clusters[0].mmean;
   (*system)->tstar = sqrt(cube((*system)->rstar)/(G*(*system)->mstar));
   (*system)->vstar = pcMyr2kms*(*system)->rstar/(*system)->tstar;
 
-  if ((*system)->Ncl == 2){
-    twobody_orbit((*system));
-  }
 }
 
 /*************************************************/
@@ -919,6 +926,9 @@ void scale(CLUSTER *cluster)
   cluster->W = -cluster->M*sqr(cluster->vrms);
   cluster->K = 0.5*cluster->M*sqr(cluster->vrms);
 
+  cluster->E = cluster->K + cluster->W;
+  cluster->lambda = cluster->Lz*sqrt(-cluster->E)/pow(cluster->M,2.5);
+
   free(m);
   free(x);
   free(y);
@@ -941,8 +951,7 @@ void twobody_orbit(SYSTEM *system)
   system->clusters[0].comvel[0] = f1*system->vrel;
   system->clusters[1].comvel[0] = -f2*system->vrel;
 
-  // Update lambda
-  system->lambda = (system->lambda/sqrt(0.25) + system->clusters[0].Lz + system->clusters[1].Lz)*sqrt(0.25);
+  // Calculate total Lz and lambda
   // Check whether clusters overlap
   double size = system->clusters[0].rcut*system->clusters[0].rh_over_rv*(system->clusters[0].rvir+system->clusters[0].rvir);
   if (system->d <= size){
@@ -951,6 +960,26 @@ void twobody_orbit(SYSTEM *system)
     fprintf(stderr," *** \n");
   }
  
+}
+
+/*************************************************/
+double Lz(SYSTEM *system)
+{
+  //Calculate total z angular momentum
+  CLUSTER *cluster = NULL;
+  double Lz_tot = 0.0;
+  
+  for (int i=0; i<system->Ncl; i++)
+    {
+      cluster = &system->clusters[i];
+      for (int j=0; j<cluster->N; j++)
+	{
+	  Lz_tot += cluster->stars[i].mass*
+	    ((cluster->stars[j].pos[0] + cluster->compos[0])*(cluster->stars[j].vel[1] + cluster->comvel[1]) -
+	     (cluster->stars[j].pos[1] + cluster->compos[1])*(cluster->stars[j].vel[0] + cluster->comvel[0]));
+	}
+    }
+  return Lz_tot;
 }
 
 /*************************************************/
@@ -1046,22 +1075,24 @@ void output(SYSTEM *system)
       fprintf(stderr,"     vrms1D     = %11.3f / %11.3f km s-1\n",cluster->vrms/sqrt(3.0), 
 	      cluster->vrms * system->vstar/sqrt(3.0));
       fprintf(stderr,"     trh        = %11.3f / %11.3f Myr\n",cluster->trh, cluster->trh * system->tstar);
-      fprintf(stderr,"     Lz / spin  = %11.3f / %11i \n",cluster->Lz, cluster->spin);
-      fprintf(stderr,"     E          = %11.3f \n",cluster->K+cluster->W); 
+      fprintf(stderr,"     E          = %11.3f \n",cluster->E); 
       fprintf(stderr,"     W          = %11.3f \n",cluster->W); 
+      fprintf(stderr,"     Lz / spin  = %11.3f / %11i \n",cluster->Lz, cluster->spin);
+      fprintf(stderr,"     lambda     = %11.3f \n",cluster->lambda);
     }
 
   if (system->Ncl == 2)
     {
-    fprintf(stderr,"\n SYSTEM PROPERTIES: \n\n");
-    fprintf(stderr,"   mu         = %11.3f \n",system->mu);
-    fprintf(stderr,"   muEorb     = %11.3f \n",system->mu*system->Ehat*0.5*system->msig2);
-    fprintf(stderr,"   muLorb     = %11.3f \n",system->mu*system->Lhat*system->mrsig);
+    fprintf(stderr,"\n SYSTEM PROPERTIES: \n");
     fprintf(stderr,"   Ehat       = %11.3f \n",system->Ehat);
     fprintf(stderr,"   Lhat       = %11.3f \n",system->Lhat);
     fprintf(stderr,"   d          = %11.3f \n",system->d);
     fprintf(stderr,"   q          = %11.3f \n",system->q);
     fprintf(stderr,"   eta        = %11.3f \n",system->eta);
+    fprintf(stderr,"   mu         = %11.3f \n",system->mu);
+    fprintf(stderr,"   Eorb       = %11.3f \n",system->mu*system->Ehat*0.5*system->msig2);
+    fprintf(stderr,"   Lorb       = %11.3f \n",system->mu*system->Lhat*system->mrsig);
+    fprintf(stderr,"   lambda_orb = %11.3f \n",system->lambda_orb);
     fprintf(stderr,"   seed       = %11i \n",system->seed);
 
     fprintf(stderr,"\n");	
@@ -1075,6 +1106,7 @@ void output(SYSTEM *system)
 	    sqrt(system->msig2), sqrt(system->msig2) * system->vstar);
     fprintf(stderr,"   vrms1D     = %11.3f / %11.3f km s-1 \n",
 	    sqrt(system->msig2/3.0), sqrt(system->msig2/3.0) * system->vstar);
+    fprintf(stderr,"   Lz         = %11.3f \n",system->Lz);
     fprintf(stderr,"   lambda     = %11.3f \n",system->lambda);
     }
   
