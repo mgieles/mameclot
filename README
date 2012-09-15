@@ -35,14 +35,16 @@
           -i IMF [0] 
              0: single mass
              1: Kroupa (2001) between 0.1 Msun and 100 Msun
-          -l Angular momentum (am) in z-direction for individual clusters [0] 
-             0: No am 
-             1: Positive am
-             2: cluster 1 positive am, cluster 2 no am
-             3: cluster 1 positive am, cluster 2 negative am
-             -1: Negative am
-             -2: clusters 1 negative am, cluster 2 no am
-             -3: clusters 1 negative am, cluster 2 positive am
+          -l Angular momentum in z-direction, -, + or x [0] 
+              0: xx (both none)
+              1: ++ (both positive)
+              2: +x 
+              3: +- 
+              4: x+ 
+              5: x- 
+             -1: -- (both negative)
+             -2: -x 
+             -3: -+ 
           -a Osipkov-Merritt anisotropy radius in units of r_0 [999] 
           -c Cut-off radius in units of r_h [20] 
           -r Physical scale in pc [1] 
