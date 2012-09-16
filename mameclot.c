@@ -951,7 +951,6 @@ void twobody_orbit(SYSTEM *system)
   system->clusters[0].comvel[0] = f1*system->vrel;
   system->clusters[1].comvel[0] = -f2*system->vrel;
 
-  // Calculate total Lz and lambda
   // Check whether clusters overlap
   double size = system->clusters[0].rcut*system->clusters[0].rh_over_rv*(system->clusters[0].rvir+system->clusters[0].rvir);
   if (system->d <= size){
@@ -974,7 +973,7 @@ double Lz(SYSTEM *system)
       cluster = &system->clusters[i];
       for (int j=0; j<cluster->N; j++)
 	{
-	  Lz_tot += cluster->stars[i].mass*
+	  Lz_tot += cluster->stars[j].mass*
 	    ((cluster->stars[j].pos[0] + cluster->compos[0])*(cluster->stars[j].vel[1] + cluster->comvel[1]) -
 	     (cluster->stars[j].pos[1] + cluster->compos[1])*(cluster->stars[j].vel[0] + cluster->comvel[0]));
 	}
