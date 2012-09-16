@@ -28,10 +28,10 @@ void parameter_use()
   fprintf(stderr," The velocities can be isotropic or radially anisotropic (a la Osipkov-Merritt)\n");
   fprintf(stderr," Optional angular momentum by aligning the angular momentum vectors along z\n");
   fprintf(stderr," System is scaled to N-body units with G = M = -4E = 1 (Heggie & Mathieu 1986)\n");
-  fprintf(stderr," In the case of a two-body system E = E_orb + E_1 + E_2 \n");
-  fprintf(stderr," The 2-body orbit is computed from input q, Ehat and Lhat (and eta if 0<q<=1):\n");
-  fprintf(stderr,"        Ehat = E_orb/0.5<sigma^2> \n");
-  fprintf(stderr,"        Lhat = L_orb/<r_vir*sigma>\n");
+  fprintf(stderr," In the case of a two-body system E = mu*e_orb + E_1 + E_2 (mu = reduced mass) \n");
+  fprintf(stderr," The 2-body orbit is computed from input q, e_hat and l_hat (and eta if q>0):\n");
+  fprintf(stderr,"        e_hat = e_orb/0.5<sigma^2> \n");
+  fprintf(stderr,"        l_hat = l_orb/<r_vir*sigma>\n");
   fprintf(stderr,"        eta => defines the relative radii: r2/r1 = q^eta, for example:\n");
   fprintf(stderr,"               eta=[-0.33/0/0.33/0.5] for equal [t_rh/r_h/rho_h/Sigma_h]\n\n");
   fprintf(stderr," Mass, pos[3], vel[3] are written to standard output\n");
@@ -428,8 +428,8 @@ void create(SYSTEM **system)
   }
   // Add orbital motion and compute total angular momentum
   if ((*system)->Ncl == 2){
-    twobody_orbit((*system));
-    (*system)->Lz = Lz((*system)); 
+    twobody_orbit(*system);
+    (*system)->Lz = Lz(*system); 
     (*system)->lambda = (*system)->Lz*sqrt(0.25);
   }
   // Set physical scaling
@@ -958,7 +958,6 @@ void twobody_orbit(SYSTEM *system)
     fprintf(stderr," *** Warning: clusters overlap: d = %5.1f and %3.1f(rh1+rh2) = %5.1f  \n",system->d,system->clusters[0].rcut,size);
     fprintf(stderr," *** \n");
   }
- 
 }
 
 /*************************************************/
@@ -1083,14 +1082,14 @@ void output(SYSTEM *system)
   if (system->Ncl == 2)
     {
     fprintf(stderr,"\n SYSTEM PROPERTIES: \n");
-    fprintf(stderr,"   Ehat       = %11.3f \n",system->Ehat);
-    fprintf(stderr,"   Lhat       = %11.3f \n",system->Lhat);
+    fprintf(stderr,"   e_hat      = %11.3f \n",system->Ehat);
+    fprintf(stderr,"   l_hat      = %11.3f \n",system->Lhat);
     fprintf(stderr,"   d          = %11.3f \n",system->d);
     fprintf(stderr,"   q          = %11.3f \n",system->q);
     fprintf(stderr,"   eta        = %11.3f \n",system->eta);
     fprintf(stderr,"   mu         = %11.3f \n",system->mu);
-    fprintf(stderr,"   Eorb       = %11.3f \n",system->mu*system->Ehat*0.5*system->msig2);
-    fprintf(stderr,"   Lorb       = %11.3f \n",system->mu*system->Lhat*system->mrsig);
+    fprintf(stderr,"   E_orb      = %11.3f \n",system->mu*system->Ehat*0.5*system->msig2);
+    fprintf(stderr,"   L_orb      = %11.3f \n",system->mu*system->Lhat*system->mrsig);
     fprintf(stderr,"   lambda_orb = %11.3f \n",system->lambda_orb);
     fprintf(stderr,"   seed       = %11i \n",system->seed);
 
@@ -1109,7 +1108,7 @@ void output(SYSTEM *system)
     fprintf(stderr,"   lambda     = %11.3f \n",system->lambda);
     }
   
-
+  
   for (int i=0; i<system->Ncl; i++)
     {
       cluster = &system->clusters[i];  
