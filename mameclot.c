@@ -29,7 +29,7 @@ void parameter_use()
   fprintf(stderr," Optional angular momentum by aligning the angular momentum vectors along z\n");
   fprintf(stderr," System is scaled to N-body units with G = M = -4E = 1 (Heggie & Mathieu 1986)\n");
   fprintf(stderr," In the case of a two-body system E = mu*e_orb + E_1 + E_2 (mu = reduced mass) \n");
-  fprintf(stderr," The 2-body orbit is computed from input q, e_hat and l_hat (and eta if q>0):\n");
+  fprintf(stderr," The 2-body orbit is computed from input q, e_hat and l_hat (and eta if q<1):\n");
   fprintf(stderr,"        e_hat = e_orb/0.5<sigma^2> \n");
   fprintf(stderr,"        l_hat = l_orb/<r_vir*sigma>\n");
   fprintf(stderr,"        eta => defines the relative radii: r2/r1 = q^eta, for example:\n");

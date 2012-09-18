@@ -9,7 +9,7 @@
  Optional angular momentum by aligning the angular momentum vectors along z
  System is scaled to N-body units with G = M = -4E = 1 (Heggie & Mathieu 1986)
  In the case of a two-body system E = mu*e_orb + E_1 + E_2 (mu = reduced mass) 
- The 2-body orbit is computed from input q, e_hat and l_hat (and eta if q>0):
+ The 2-body orbit is computed from input q, e_hat and l_hat (and eta if q<1):
         e_hat = e_orb/0.5<sigma^2> 
         l_hat = l_orb/<r_vir*sigma>
         eta => defines the relative radii: r2/r1 = q^eta, for example:
