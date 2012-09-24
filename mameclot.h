@@ -28,6 +28,7 @@ typedef struct star{
 typedef struct cluster{
   int N;
   int model; // 0=Cored gamma-model; 1=Hernquist; 2=Jaffe; 3=Isochrone; 4=Plummer
+  int id;
   char name[15];
   int gamma;
   int imftype;
@@ -76,6 +77,8 @@ typedef struct system{
   double Lhat;
   double mrsig;
   double msig2;
+  double rfac;
+  double vfac;
   CLUSTER *clusters;
 } SYSTEM;
 
@@ -94,8 +97,10 @@ double get_v(double r, int model);
 void get_osipkov_merrit_v_eta(double r, double ra,int model, double *v, double *eta);
 void get_q_eta_pair(double p, double *q, double *eta);
 void scale(CLUSTER *cluster);
+void scale_system(SYSTEM *system);
 double Lz(SYSTEM *system);
 extern void calculate_potential();
+extern void calculate_cross_potential();
 void twobody_orbit(SYSTEM *system);
 double dawson(double x);
 void shell(double a[], int n);

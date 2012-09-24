@@ -255,8 +255,11 @@ void initialize(SYSTEM **system, INPUT parameters)
   (*system)->N = parameters.N;
   (*system)->seed = parameters.seed;
   (*system)->rstar = parameters.rbar;
+  (*system)->rfac = 1.0; // rfac and vfac will be updated in case of 2 clusters
+  (*system)->vfac = 1.0;
   (*system)->clusters[0].N = parameters.N;
   (*system)->clusters[0].M = 1.0;
+  (*system)->clusters[0].id = 0;
   (*system)->clusters[0].imftype = parameters.imftype;
   (*system)->clusters[0].rvir = 1.0;
   (*system)->clusters[0].rcut = parameters.rcut;
@@ -377,6 +380,7 @@ void initialize(SYSTEM **system, INPUT parameters)
       (*system)->clusters[1].N = parameters.N2;
       (*system)->d = parameters.d;
       (*system)->clusters[1].imftype = parameters.imftype;
+      (*system)->clusters[1].id = 1;
       (*system)->clusters[1].model = parameters.model;
       (*system)->clusters[1].gamma = parameters.gamma;
       (*system)->clusters[1].ra = parameters.ra;
@@ -426,9 +430,11 @@ void create(SYSTEM **system)
     get_pos_vel(cluster);
     scale(cluster); 
   }
+
   // Add orbital motion and compute total angular momentum
   if ((*system)->Ncl == 2){
     twobody_orbit(*system);
+    scale_system(*system);
     (*system)->Lz = Lz(*system); 
     (*system)->lambda = (*system)->Lz*sqrt(0.25);
   }
@@ -873,9 +879,8 @@ void scale(CLUSTER *cluster)
   float *z = (float *)malloc(N*sizeof(float));
   float *phi = (float *)malloc(N*sizeof(float));
   
-
   double rfac = cluster->rvir/cluster->rv_over_r0;
-  double vfac = sqrt(cluster->M*cluster->rv_over_r0/cluster->rvir);
+  double vfac = sqrt(cluster->M/rfac);
   cluster->Lz *= rfac*vfac;
 
   for (int i=0; i<cluster->N; i++)
@@ -899,8 +904,8 @@ void scale(CLUSTER *cluster)
       phi[i] = 0.0; 
   }
   
-  // This function is executed on the CPU (defined in pot.c) or GPU (defined in pot.cu)
-  calculate_potential(m, x, y, z, phi, &N);
+  // This function is executed on the CPU (defined in pot.c) or GPU (defined in gpupot.cu)
+  calculate_potential(m, x, y, z, phi, N, 0);
 
   for (int i=0; i<cluster->N; i++){
     cluster->stars[i].phi = phi[i];
@@ -909,6 +914,7 @@ void scale(CLUSTER *cluster)
     }
     cluster->W += 0.5*cluster->stars[i].mass*cluster->stars[i].phi;
   }
+
   rfac = -cluster->W/(cluster->M*sqr(cluster->vrms));
   vfac = sqrt(0.5*cluster->M*sqr(cluster->vrms)/cluster->K);
   cluster->Lz *= rfac*vfac;
@@ -920,8 +926,8 @@ void scale(CLUSTER *cluster)
     }
   }
 
-  fprintf(stderr," Scale factor: pos = %10.5f; vel = %10.5f \n", 
-  	  rfac,vfac);
+  fprintf(stderr," Scale factor cluster %1i: pos = %8.5f; vel = %8.5f \n", 
+  	  cluster->id,rfac,vfac);
 
   cluster->W = -cluster->M*sqr(cluster->vrms);
   cluster->K = 0.5*cluster->M*sqr(cluster->vrms);
@@ -952,12 +958,67 @@ void twobody_orbit(SYSTEM *system)
   system->clusters[1].comvel[0] = -f2*system->vrel;
 
   // Check whether clusters overlap
-  double size = system->clusters[0].rcut*system->clusters[0].rh_over_rv*(system->clusters[0].rvir+system->clusters[0].rvir);
+  double size = system->clusters[0].rcut*system->clusters[0].rh_over_rv*(system->clusters[0].rvir + system->clusters[1].rvir);
   if (system->d <= size){
     fprintf(stderr," *** \n");
     fprintf(stderr," *** Warning: clusters overlap: d = %5.1f and %3.1f(rh1+rh2) = %5.1f  \n",system->d,system->clusters[0].rcut,size);
     fprintf(stderr," *** \n");
   }
+}
+/*************************************************/
+void scale_system(SYSTEM *system)
+{ 
+  // Computes the final scaling factors for pos and vel. They are applied in output()
+  int N = (int)system->N;
+  float *m = (float *)malloc(N*sizeof(float));
+  float *x = (float *)malloc(N*sizeof(float));
+  float *y = (float *)malloc(N*sizeof(float));
+  float *z = (float *)malloc(N*sizeof(float));
+  float *phi = (float *)malloc(N*sizeof(float));
+
+  int N1 = system->clusters[0].N;
+  double v2;
+  double W = 0;
+  double K = 0;
+  double K_final, W_final;
+
+  for (int i=0; i<system->Ncl; i++){
+    W += system->clusters[i].W;
+    for (int j=0; j<system->clusters[i].N; j++){
+      m[i*N1+j] = system->clusters[i].stars[j].mass;
+      x[i*N1+j] = system->clusters[i].stars[j].pos[0] + system->clusters[i].compos[0];
+      y[i*N1+j] = system->clusters[i].stars[j].pos[1] + system->clusters[i].compos[1];
+      z[i*N1+j] = system->clusters[i].stars[j].pos[2] + system->clusters[i].compos[2];
+      phi[i*N1+j] = 0.0;
+      v2 = 0;
+      for (int k=0; k<3; k++){
+	v2 += sqr(system->clusters[i].stars[j].vel[k] + system->clusters[i].comvel[k]);
+      }      
+      K += 0.5*system->clusters[i].stars[j].mass*v2;
+    }
+  } 
+  W_final = W - system->mu/system->d;
+  K_final = system->clusters[0].K + system->clusters[1].K + 0.5*system->mu*sqr(system->vrel);
+
+  // This function is executed on the CPU (defined in pot.c) or GPU (defined in gpupot.cu)
+  calculate_potential(m,x,y,z,phi,N,N1);
+
+  for (int i=0; i < N1; i++){
+    // On GPU the specific potential of the 2nd cluster is not computed, that is why the
+    // binding energy of cluster pair is computed as sum of specific potentials of cluster 1
+    // (without the usual /2)
+    W += m[i]*phi[i];
+  }
+
+  system->rfac = W/W_final;
+  system->vfac = sqrt(K_final/K);
+  fprintf(stderr," Scale factor system:    pos = %8.5f; vel = %8.5f \n",system->rfac,system->vfac);
+
+  free(m);
+  free(x);
+  free(y);
+  free(z);
+  free(phi);
 }
 
 /*************************************************/
@@ -972,7 +1033,7 @@ double Lz(SYSTEM *system)
       cluster = &system->clusters[i];
       for (int j=0; j<cluster->N; j++)
 	{
-	  Lz_tot += cluster->stars[j].mass*
+	  Lz_tot += system->rfac*system->vfac*cluster->stars[j].mass*
 	    ((cluster->stars[j].pos[0] + cluster->compos[0])*(cluster->stars[j].vel[1] + cluster->comvel[1]) -
 	     (cluster->stars[j].pos[1] + cluster->compos[1])*(cluster->stars[j].vel[0] + cluster->comvel[0]));
 	}
@@ -1113,14 +1174,14 @@ void output(SYSTEM *system)
     {
       cluster = &system->clusters[i];  
       for (int j=0;j<cluster->N;j++){
-      	printf("%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e \n",
+	printf("%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e \n",
       	       cluster->stars[j].mass,
-	       cluster->stars[j].pos[0] + cluster->compos[0],
-	       cluster->stars[j].pos[1] + cluster->compos[1],
-	       cluster->stars[j].pos[2] + cluster->compos[2],
-	       cluster->stars[j].vel[0] + cluster->comvel[0],
-	       cluster->stars[j].vel[1] + cluster->comvel[1],
-	       cluster->stars[j].vel[2] + cluster->comvel[2]); 
+	       (cluster->stars[j].pos[0] + cluster->compos[0])*system->rfac,
+	       (cluster->stars[j].pos[1] + cluster->compos[1])*system->rfac,
+	       (cluster->stars[j].pos[2] + cluster->compos[2])*system->rfac,
+	       (cluster->stars[j].vel[0] + cluster->comvel[0])*system->vfac,
+	       (cluster->stars[j].vel[1] + cluster->comvel[1])*system->vfac,
+	       (cluster->stars[j].vel[2] + cluster->comvel[2])*system->vfac); 
       }
     }   
 }
