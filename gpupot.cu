@@ -9,9 +9,6 @@
 
 #define BLOCKSIZE 256
 	
-
-
-
 //Computing the Potential on the Device
 __global__ void compute_potential_gpu(float *m, 
 	   float *x, float *y, float *z, float *phi, int N, int N1) {
@@ -24,7 +21,6 @@ __global__ void compute_potential_gpu(float *m,
     yi = y[i];
     zi = z[i];
 
-    phi[i] = 0.0f;    
     for (j = (N1 == 0 ? 0 : N1); j < N; j++) {
       rijx = xi - x[j];
       rijy = yi - y[j];
