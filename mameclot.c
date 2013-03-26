@@ -1183,7 +1183,30 @@ void output(SYSTEM *system)
 	       (cluster->stars[j].vel[1] + cluster->comvel[1])*system->vfac,
 	       (cluster->stars[j].vel[2] + cluster->comvel[2])*system->vfac); 
       }
-    }   
+    }  
+
+  // Save individual clusters
+  FILE *p = NULL;
+  char file[10];
+  
+  for (int i=0; i<system->Ncl; i++)
+    {
+      sprintf(file,"cluster.%d",i+1);
+      p = fopen(file,"w");
+      
+      cluster = &system->clusters[i];  
+      for (int j=0;j<cluster->N;j++){
+	fprintf(p, "%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e \n",
+		cluster->stars[j].mass,
+		cluster->stars[j].pos[0],
+		cluster->stars[j].pos[1],
+		cluster->stars[j].pos[2],
+		cluster->stars[j].vel[0],
+		cluster->stars[j].vel[1],
+		cluster->stars[j].vel[2]); 
+      }
+    }
+      
 }
 
 /*************************************************/
@@ -1195,7 +1218,7 @@ void free_memory(SYSTEM *system)
 }
 
 /*************************************************/
-int main (int argc, char** argv)
+int main(int argc, char** argv)
 {
   SYSTEM *system = NULL;
   INPUT parameters;
