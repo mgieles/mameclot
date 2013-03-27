@@ -1119,8 +1119,12 @@ void output(SYSTEM *system)
   
   fprintf(stderr,"\n CLUSTER PROPERTIES: \n");
   for (int i=0; i<system->Ncl; i++)
-    {
+    { 
+
       cluster = &system->clusters[i];  
+      double r_h = cluster->rvir*cluster->rh_over_rv;
+      double rho_h = 3.0*cluster->M/(8.0*PI*pow(r_h,3.0));
+
       fprintf(stderr," #%i: %7s: rv/r0=%5.3f; rh/r0=%5.3f; rh/rv=%5.3f; rcut/rh=%3.1f; ra/r0=%3.1f\n",i+1, 
 	      cluster->name,cluster->rv_over_r0,cluster->rh_over_r0,cluster->rh_over_rv,
 	      cluster->rcut,cluster->ra);
@@ -1128,8 +1132,8 @@ void output(SYSTEM *system)
       fprintf(stderr,"     N          = %11i \n",cluster->N); 
       fprintf(stderr,"     M          = %11.3f / %11.3f Msun\n",cluster->M,cluster->M * system->mstar);
       fprintf(stderr,"     r_vir      = %11.3f / %11.3f pc \n",cluster->rvir, cluster->rvir * system->rstar);
-      fprintf(stderr,"     r_h        = %11.3f / %11.3f pc \n",
-	      cluster->rvir*cluster->rh_over_rv, cluster->rvir * cluster->rh_over_rv *system->rstar);
+      fprintf(stderr,"     r_h        = %11.3f / %11.3f pc \n",r_h,r_h*system->rstar);
+      fprintf(stderr,"     rho_h      = %11.3f / %11.3f Msun/pc3 \n",rho_h, rho_h*system->mstar/pow(system->rstar,3.0));
       fprintf(stderr,"     vrms       = %11.3f / %11.3f km s-1\n",cluster->vrms, cluster->vrms * system->vstar);
       fprintf(stderr,"     vrms1D     = %11.3f / %11.3f km s-1\n",cluster->vrms/sqrt(3.0), 
 	      cluster->vrms * system->vstar/sqrt(3.0));
