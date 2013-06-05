@@ -80,7 +80,7 @@ void parameter_use()
   exit (0);
 }
 
-/*************************************************/
+/*******************plu******************************/
 void parameter_check(INPUT *parameters){
   char name[5][15] = { "Cored gamma", "Hernquist", "Jaffe", "Isochrone", "Plummer" };
   double minra[5] = {0.315,1.0/sqrt(24.0),0.023,0.874,0.75};  // Minimum anistropy radius for positive DF
@@ -88,58 +88,44 @@ void parameter_check(INPUT *parameters){
   
   // Check if anisotropy can be applied
   if (parameters->ra < minra[parameters->model]){
-    fprintf(stderr," *** \n");
-    fprintf(stderr," *** Input error: Minimum anistropy radius for %s model = %5.3f * r0 \n",name[parameters->model],minra[parameters->model]);
-    fprintf(stderr," *** \n");
+    fprintf(stderr," *** \n *** Input error: Minimum anistropy radius for %s model = %5.3f * r0 \n *** \n",name[parameters->model],minra[parameters->model]);
     exit (0);
   }
 
   // Check for maximum Ehat
   if (parameters->Ehat >= 4){
-    fprintf(stderr," *** \n");
-    fprintf(stderr," *** Input error: Ehat >= 4 : total energy positive \n");
-    fprintf(stderr," *** \n");
+    fprintf(stderr," *** \n *** Input error: Ehat >= 4 : total energy positive \n *** \n");
     exit (0);
   }
   
   // Check q
   if ((parameters->q < 0)||(parameters->q>1)){
-    fprintf(stderr," *** \n");
-    fprintf(stderr," *** Input error: q must be between 0 and 1 \n");
-    fprintf(stderr," *** \n");
+    fprintf(stderr," *** \n *** Input error: q must be between 0 and 1 \n *** \n");
     exit (0);
   }
 
   // Check rcut
   if (parameters->rcut < 5){
-    fprintf(stderr," *** \n");
-    fprintf(stderr," *** Input error: cut-off radius must be larger than 5r_h \n");
-    fprintf(stderr," *** \n");
+    fprintf(stderr," *** \n *** Input error: cut-off radius must be larger than 5r_h \n *** \n");
     exit (0);
   }
 
   // Check d
   if (parameters->d <= 0){
-    fprintf(stderr," *** \n");
-    fprintf(stderr," *** Warning: d must be positive \n");
-    fprintf(stderr," *** \n");
+    fprintf(stderr," *** \n *** Warning: d must be positive \n *** \n");
     exit (0);
   }
 
   // Check imftype
   if ((parameters->imftype < 0)||(parameters->imftype>1)){
-    fprintf(stderr," *** \n");
-    fprintf(stderr," *** Input error: IMF type must be 0 or 1  \n");
-    fprintf(stderr," *** \n");
+    fprintf(stderr," *** \n *** Input error: IMF type must be 0 or 1 \n *** \n");
     exit (0);
   }
   if (parameters->model <= 2)
     parameters->gamma = parameters->model;
   
   if (parameters->model >= 5){
-    fprintf(stderr," *** \n");
-    fprintf(stderr," *** Input error: -m %2i : model must be <= 4\n",parameters->model);
-    fprintf(stderr," *** \n");
+    fprintf(stderr," *** \n *** Input error: -m %2i : model must be <= 4\n *** \n",parameters->model);
     exit(0);
   }
   strcpy(parameters->name, name[parameters->model]);
@@ -192,7 +178,7 @@ void get_args(int argc, char** argv, INPUT *parameters)
   for(int i = 1; i < argc; i++){
     if (argv[i][0] == '-'){
       switch (argv[i][1]){
-      case 'N': parameters->N = atoi(argv[++i]);
+      case 'N': parameters->N = atof(argv[++i]);
 	break;
       case 'q': parameters->q = atof(argv[++i]);
 	break;
@@ -915,6 +901,7 @@ void scale(CLUSTER *cluster)
     cluster->W += 0.5*cluster->stars[i].mass*cluster->stars[i].phi;
   }
 
+
   rfac = -cluster->W/(cluster->M*sqr(cluster->vrms));
   vfac = sqrt(0.5*cluster->M*sqr(cluster->vrms)/cluster->K);
   cluster->Lz *= rfac*vfac;
@@ -1123,7 +1110,7 @@ void output(SYSTEM *system)
 
       cluster = &system->clusters[i];  
       double r_h = cluster->rvir*cluster->rh_over_rv;
-      double rho_h = 3.0*cluster->M/(8.0*PI*pow(r_h,3.0));
+      double rho_h = 3.0*cluster->M/(8.0*PI*cube(r_h));
 
       fprintf(stderr," #%i: %7s: rv/r0=%5.3f; rh/r0=%5.3f; rh/rv=%5.3f; rcut/rh=%3.1f; ra/r0=%3.1f\n",i+1, 
 	      cluster->name,cluster->rv_over_r0,cluster->rh_over_r0,cluster->rh_over_rv,
@@ -1133,7 +1120,7 @@ void output(SYSTEM *system)
       fprintf(stderr,"     M          = %11.3f / %11.3f Msun\n",cluster->M,cluster->M * system->mstar);
       fprintf(stderr,"     r_vir      = %11.3f / %11.3f pc \n",cluster->rvir, cluster->rvir * system->rstar);
       fprintf(stderr,"     r_h        = %11.3f / %11.3f pc \n",r_h,r_h*system->rstar);
-      fprintf(stderr,"     rho_h      = %11.3f / %11.3f Msun/pc3 \n",rho_h, rho_h*system->mstar/pow(system->rstar,3.0));
+      fprintf(stderr,"     rho_h      = %11.3f / %11.3f Msun/pc3 \n",rho_h, rho_h*system->mstar/cube(system->rstar));
       fprintf(stderr,"     vrms       = %11.3f / %11.3f km s-1\n",cluster->vrms, cluster->vrms * system->vstar);
       fprintf(stderr,"     vrms1D     = %11.3f / %11.3f km s-1\n",cluster->vrms/sqrt(3.0), 
 	      cluster->vrms * system->vstar/sqrt(3.0));
@@ -1178,37 +1165,41 @@ void output(SYSTEM *system)
     {
       cluster = &system->clusters[i];  
       for (int j=0;j<cluster->N;j++){
-	printf("%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e \n",
+	printf("%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e %18.10e \n",
       	       cluster->stars[j].mass,
 	       (cluster->stars[j].pos[0] + cluster->compos[0])*system->rfac,
 	       (cluster->stars[j].pos[1] + cluster->compos[1])*system->rfac,
 	       (cluster->stars[j].pos[2] + cluster->compos[2])*system->rfac,
 	       (cluster->stars[j].vel[0] + cluster->comvel[0])*system->vfac,
 	       (cluster->stars[j].vel[1] + cluster->comvel[1])*system->vfac,
-	       (cluster->stars[j].vel[2] + cluster->comvel[2])*system->vfac); 
+	       (cluster->stars[j].vel[2] + cluster->comvel[2])*system->vfac,
+	       (cluster->stars[j].phi+cluster->stars[j].kin)*pow(system->rfac/system->vfac,2.0)); 
       }
     }  
 
-  // Save individual clusters
-  FILE *p = NULL;
-  char file[10];
-  
-  for (int i=0; i<system->Ncl; i++)
+  // Save individual clusters in case of multiple clusters
+  if ((int)&system->Ncl >= 1)
     {
-      sprintf(file,"cluster.%d",i+1);
-      p = fopen(file,"w");
+      FILE *p = NULL;
+      char file[10];
       
-      cluster = &system->clusters[i];  
-      for (int j=0;j<cluster->N;j++){
-	fprintf(p, "%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e \n",
-		cluster->stars[j].mass,
-		cluster->stars[j].pos[0],
-		cluster->stars[j].pos[1],
-		cluster->stars[j].pos[2],
-		cluster->stars[j].vel[0],
-		cluster->stars[j].vel[1],
-		cluster->stars[j].vel[2]); 
-      }
+      for (int i=0; i<system->Ncl; i++)
+	{
+	  sprintf(file,"cluster.%d",i+1);
+	  p = fopen(file,"w");
+	  
+	  cluster = &system->clusters[i];  
+	  for (int j=0;j<cluster->N;j++){
+	    fprintf(p, "%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e \n",
+		    cluster->stars[j].mass,
+		    cluster->stars[j].pos[0],
+		    cluster->stars[j].pos[1],
+		    cluster->stars[j].pos[2],
+		    cluster->stars[j].vel[0],
+		    cluster->stars[j].vel[1],
+		    cluster->stars[j].vel[2]); 
+	  }
+	}
     }
       
 }
