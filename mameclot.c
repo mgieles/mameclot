@@ -1178,7 +1178,7 @@ void output(SYSTEM *system)
     }  
 
   // Save individual clusters in case of multiple clusters
-  if ((int)&system->Ncl >= 1)
+  if (system->Ncl >= 1)
     {
       FILE *p = NULL;
       char file[10];
