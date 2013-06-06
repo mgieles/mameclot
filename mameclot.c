@@ -656,6 +656,9 @@ double get_r(CLUSTER *cluster)
 	case (3):
 	  // "Isochrone" sphere (Henon 1959)
 	  // Can be done quicker/easier?
+	  if (a>0.999999)
+	    a = 0.999999;
+
 	  a2 = sqr(a);	
 	  a4 = sqr(a2);
 	  a6 = a4*a2;
@@ -1178,7 +1181,7 @@ void output(SYSTEM *system)
     }  
 
   // Save individual clusters in case of multiple clusters
-  if (system->Ncl >= 1)
+  if (system->Ncl > 1)
     {
       FILE *p = NULL;
       char file[10];
