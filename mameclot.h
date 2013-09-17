@@ -6,6 +6,7 @@ typedef struct input{
   int model;
   int imftype; // 0=equal mass; 1=Kroupa (2001)
   int spin;
+  float frot;
   double ra;
   char name[15];
   int gamma;
@@ -33,6 +34,7 @@ typedef struct cluster{
   int gamma;
   int imftype;
   int spin;
+  float frot;
   float ra;
   float rh_over_r0;
   float rv_over_r0;
@@ -42,6 +44,7 @@ typedef struct cluster{
   float W;
   float K;
   float Lz;
+  float Krot;
   float lambda;
   double vrms; 
   double rvir; 

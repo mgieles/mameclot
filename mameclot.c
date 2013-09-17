@@ -48,9 +48,9 @@ void parameter_use()
   fprintf(stderr,"          -q Mass ratio of the two clusters (q=m2/m1) [0] \n");
   fprintf(stderr,"             0: Make 1 cluster\n");
   fprintf(stderr,"             0<q<=1: Make 2 clusters\n");
-  fprintf(stderr,"          -e (eta) relative cluster sizes: r2/r1 = q^eta [0.333] \n");
+  fprintf(stderr,"          -e eta: Relative cluster sizes: r2/r1 = q^eta [0.333] \n");
   fprintf(stderr,"          -i IMF [0] \n");
-  fprintf(stderr,"             0: single mass\n");
+  fprintf(stderr,"             0: Single mass cluster\n");
   fprintf(stderr,"             1: Kroupa (2001) between 0.1 Msun and 100 Msun\n");
   fprintf(stderr,"          -l Angular momentum in z-direction, -, + or x [0] \n");
   fprintf(stderr,"              0: xx (both none)\n");
@@ -62,10 +62,11 @@ void parameter_use()
   fprintf(stderr,"             -1: -- (both negative)\n");
   fprintf(stderr,"             -2: -x \n");
   fprintf(stderr,"             -3: -+ \n");
+  fprintf(stderr,"          -f Fraction of maximum rotational energy [1] \n");
   fprintf(stderr,"          -a Osipkov-Merritt anisotropy radius in units of r_0 [999] \n");
   fprintf(stderr,"          -c Cut-off radius in units of r_h [20] \n");
   fprintf(stderr,"          -r Physical scale in pc [1] \n");
-  fprintf(stderr,"          -d distance between 2 clusters in N-body units [20] \n");
+  fprintf(stderr,"          -d Distance between 2 clusters in N-body units [20] \n");
   fprintf(stderr,"          -E Dimensionless orbital energy of two-cluster system [0] \n");
   fprintf(stderr,"          -L Dimensionless orbital angular momentum two-cluster system [4]\n");  
   fprintf(stderr,"             <0 : forces a circular orbit\n");  
@@ -80,7 +81,7 @@ void parameter_use()
   exit (0);
 }
 
-/*******************plu******************************/
+/*************************************************/
 void parameter_check(INPUT *parameters){
   char name[5][15] = { "Cored gamma", "Hernquist", "Jaffe", "Isochrone", "Plummer" };
   double minra[5] = {0.315,1.0/sqrt(24.0),0.023,0.874,0.75};  // Minimum anistropy radius for positive DF
@@ -113,6 +114,12 @@ void parameter_check(INPUT *parameters){
   // Check d
   if (parameters->d <= 0){
     fprintf(stderr," *** \n *** Warning: d must be positive \n *** \n");
+    exit (0);
+  }
+  
+  // Check frot
+  if ((parameters->frot < 0)||(parameters->frot>1)){
+    fprintf(stderr," *** \n *** Input error: f_rot must be between 0 and 1 \n *** \n");
     exit (0);
   }
 
@@ -159,6 +166,7 @@ void get_args(int argc, char** argv, INPUT *parameters)
   parameters->model   = 3; //  0=Cored gamma-model; 1=Hernquist; 2=Jaffe; 3=Isochrone; 4=Plummer; 
 
   parameters->spin    = 0;  
+  parameters->frot    = 1;  
   parameters->ra      = 999;  
   parameters->imftype = 0;  // 0=equal mass; 1=Kroupa (2001)
   parameters->seed    = 0;  // pc  
@@ -191,6 +199,8 @@ void get_args(int argc, char** argv, INPUT *parameters)
       case 'e': parameters->eta = atof(argv[++i]);
 	break;
       case 'l': parameters->spin = atoi(argv[++i]);
+	break;
+      case 'f': parameters->frot = atof(argv[++i]);
 	break;
       case 'a': parameters->ra = atof(argv[++i]);
 	break;
@@ -256,7 +266,10 @@ void initialize(SYSTEM **system, INPUT parameters)
   strcpy((*system)->clusters[0].name, parameters.name);
 
   if ((fabs(parameters.spin)>=1)&&(fabs(parameters.spin)<=3))
-    (*system)->clusters[0].spin = sign(parameters.spin);
+    {
+      (*system)->clusters[0].spin = sign(parameters.spin);
+      (*system)->clusters[0].frot = parameters.frot;
+    }
   if (parameters.spin>=4)
     (*system)->clusters[0].spin = 0;
 
@@ -559,10 +572,11 @@ void imf(CLUSTER *cluster)
 void get_pos_vel(CLUSTER *cluster)
 {
   // Sample positions and velocities. Total mass assumed to be 1 at this stage.
-  double r, r2, v, eta, v2, a[5], lz;
+  double r, r2, v, eta, v2, a[5], lz, R2;
   double vr, vt,  vtheta, vphi, theta, phi;
 
   cluster->Lz = 0.0;
+  cluster->Krot = 0.0;
 
   for (int i=0; i<cluster->N; i++)
     {
@@ -620,14 +634,24 @@ void get_pos_vel(CLUSTER *cluster)
 	cluster->stars[i].pos[1]*cluster->stars[i].vel[0];
       if (cluster->spin!=0){
 	if (cluster->spin!=sign(lz)){
-	  cluster->stars[i].vel[0] *= -1.0;
-	  cluster->stars[i].vel[1] *= -1.0;
-	  lz *= -1.0;
+	  if (myrand()<sqrt(cluster->frot)){
+	    cluster->stars[i].vel[0] *= -1.0;
+	    cluster->stars[i].vel[1] *= -1.0;
+	    lz *= -1.0;
+	  }
 	}
       }
       cluster->Lz += cluster->stars[i].mass*lz;
+
+      // Add mass weighted v_phi to Krot
+      R2 = pow(cluster->stars[i].pos[0],2.0) + pow(cluster->stars[i].pos[1],2.0);
+      cluster->Krot += cluster->stars[i].mass*lz/sqrt(R2);
     }  
+  // Krot = 0.5*M*<v_phi>^2
+  cluster->Krot = 0.5*pow(cluster->Krot,2.0);  
 }
+
+
 
 /*************************************************/
 double get_r(CLUSTER *cluster)
@@ -871,6 +895,7 @@ void scale(CLUSTER *cluster)
   double rfac = cluster->rvir/cluster->rv_over_r0;
   double vfac = sqrt(cluster->M/rfac);
   cluster->Lz *= rfac*vfac;
+  cluster->Krot *= vfac*vfac;
 
   for (int i=0; i<cluster->N; i++)
     {
@@ -904,10 +929,10 @@ void scale(CLUSTER *cluster)
     cluster->W += 0.5*cluster->stars[i].mass*cluster->stars[i].phi;
   }
 
-
   rfac = -cluster->W/(cluster->M*sqr(cluster->vrms));
   vfac = sqrt(0.5*cluster->M*sqr(cluster->vrms)/cluster->K);
   cluster->Lz *= rfac*vfac;
+  cluster->Krot *= vfac;
 
   for (int i=0; i<cluster->N; i++){
     for (int k=0; k<3; k++){
@@ -1131,6 +1156,7 @@ void output(SYSTEM *system)
       fprintf(stderr,"     E          = %11.3f \n",cluster->E); 
       fprintf(stderr,"     W          = %11.3f \n",cluster->W); 
       fprintf(stderr,"     Lz / spin  = %11.3f / %11i \n",cluster->Lz, cluster->spin);
+      fprintf(stderr,"     Krot/K     = %11.3f \n",cluster->Krot/cluster->K);
       fprintf(stderr,"     lambda     = %11.3f \n",cluster->lambda);
     }
 
