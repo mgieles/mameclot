@@ -643,7 +643,7 @@ void get_pos_vel(CLUSTER *cluster)
       }
       cluster->Lz += cluster->stars[i].mass*lz;
 
-      // Add mass weighted v_phi to Krot
+      // Add mass weighted mean v_phi to Krot
       R2 = pow(cluster->stars[i].pos[0],2.0) + pow(cluster->stars[i].pos[1],2.0);
       cluster->Krot += cluster->stars[i].mass*lz/sqrt(R2);
     }  
@@ -932,7 +932,7 @@ void scale(CLUSTER *cluster)
   rfac = -cluster->W/(cluster->M*sqr(cluster->vrms));
   vfac = sqrt(0.5*cluster->M*sqr(cluster->vrms)/cluster->K);
   cluster->Lz *= rfac*vfac;
-  cluster->Krot *= vfac;
+  cluster->Krot *= vfac*vfac;
 
   for (int i=0; i<cluster->N; i++){
     for (int k=0; k<3; k++){
