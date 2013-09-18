@@ -17,7 +17,7 @@ default:	$(OBJ) $(CPUOBJ)
 		$(CC)  -o $(EXE) pot.o $(OBJ) $(LIBS) 
 
 gpu:	$(OBJ)
-	$(NVCC) -c -m64 -arch -sm_20  gpupot.cu
+	$(NVCC) -c -m64 -arch sm_20  gpupot.cu
 	$(CC)  $(CUDAFLAGS)  -o $(EXE).gpu $(CUDAOBJ) $(OBJ) $(LIBS)
 
 
