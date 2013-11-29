@@ -18,7 +18,7 @@ default:	$(OBJ) $(CPUOBJ)
 
 gpu:	$(OBJ)
 	$(NVCC) -c -m64   gpupot.cu
-	$(CC)  $(CUDAFLAGS)  -o $(EXE).gpu $(CUDAOBJ) $(OBJ) $(LIBS)
+	$(CC)   -o $(EXE).gpu $(CUDAOBJ) $(OBJ) $(LIBS) $(CUDAFLAGS) 
 
 
 clean:	
