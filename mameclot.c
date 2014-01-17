@@ -1194,15 +1194,15 @@ void output(SYSTEM *system)
     {
       cluster = &system->clusters[i];  
       for (int j=0;j<cluster->N;j++){
-	printf("%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e %18.10e \n",
+	printf("%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e  \n",
       	       cluster->stars[j].mass,
 	       (cluster->stars[j].pos[0] + cluster->compos[0])*system->rfac,
 	       (cluster->stars[j].pos[1] + cluster->compos[1])*system->rfac,
 	       (cluster->stars[j].pos[2] + cluster->compos[2])*system->rfac,
 	       (cluster->stars[j].vel[0] + cluster->comvel[0])*system->vfac,
 	       (cluster->stars[j].vel[1] + cluster->comvel[1])*system->vfac,
-	       (cluster->stars[j].vel[2] + cluster->comvel[2])*system->vfac,
-	       (cluster->stars[j].phi+cluster->stars[j].kin)*pow(system->rfac/system->vfac,2.0)); 
+	       (cluster->stars[j].vel[2] + cluster->comvel[2])*system->vfac);
+	       //	       (cluster->stars[j].phi+cluster->stars[j].kin)*pow(system->rfac/system->vfac,2.0)); 
       }
     }  
 
