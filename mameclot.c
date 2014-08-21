@@ -450,7 +450,7 @@ void set_scalings(CLUSTER *cluster)
   switch (cluster->model)
     {
     case (0): 
-      // Cored gamma/eta model (Dehnen 1993)
+      // Cored gamma/eta (Dehnen 1993; Tremaine et al. 1994)
       cluster->rh_over_r0 = 3.8473;
       cluster->rv_over_r0 = 5.0;
       break;
@@ -465,12 +465,12 @@ void set_scalings(CLUSTER *cluster)
       cluster->rv_over_r0 = 1.0;
       break;
     case (3):
-      // Henon (1959) "Isochrone" sphere
+      // Henon (1959) "Isochrone" 
       cluster->rh_over_r0 = 3.0603;
-      cluster->rv_over_r0 = 4.0;      
+      cluster->rv_over_r0 = 6./(3*PI-8);      
       break;
     case (4):
-      // Plummer
+      // Plummer (1911)
       cluster->rh_over_r0 = 1.0/sqrt(pow(2.0,2.0/3.0)-1.0);
       cluster->rv_over_r0 = 16.0/(3.0*PI);
       break;
@@ -656,7 +656,7 @@ void get_pos_vel(CLUSTER *cluster)
 /*************************************************/
 double get_r(CLUSTER *cluster)
 {
-  double r, a, a2, a4, a6, p1, p2, p3, p4;
+  double r, a, a2, p1, p2;
   
   r=2.0*cluster->rmax_over_r0;
   while (r > cluster->rmax_over_r0)
@@ -670,15 +670,17 @@ double get_r(CLUSTER *cluster)
 	  r = p1/(1.0-p1);
 	  break;
 	case (1):
-	  // Hernquist (1990)
-	  r=(-a-sqrt(sqr(a)-a*(a-1.0)))/(a-1.0);
+	  // Hernquist (1990) model
+	  r = (-a-sqrt(sqr(a)-a*(a-1.0)))/(a-1.0);
 	  break;
 	case (2):
-	  // Jaffe (1993)
+	  // Jaffe (1993) model
 	  r = a/(1.0-a);
 	  break;
 	case (3):
-	  // "Isochrone" sphere (Henon 1959)
+	  // "Isochrone" model (Henon 1959)
+
+	  /*
 	  // Can be done quicker/easier?
 	  if (a>0.999999)
 	    a = 0.999999;
@@ -686,14 +688,22 @@ double get_r(CLUSTER *cluster)
 	  a2 = sqr(a);	
 	  a4 = sqr(a2);
 	  a6 = a4*a2;
+
 	  p1 = a2*sqrt(a2+27.0)/(3.0*sqrt(3.0)*sqr(a2-1.0));
 	  p2 = (a6+36.0*a4+27.0*a2)/(27.0*a6-81.0*a4+81.0*a2-27.0);
 	  p3 = pow(p1-p2,1.0/3.0);
 	  p4 = p3+(a4+15.0*a2)/((9.0*a4-18.0*a2+9.0)*p3)-(a2+3.0)/(3.0*a2-3.0);
 	  r = sqrt(sqr(p4)-1.0);
+	  */
+
+	  // Simpler and safer?
+	  a2 = sqr(a);	
+	  p1 = 1.5*sqrt(3.0)*(a-1.0)*(a+1.0)*(2.0+a2)*sqrt(27.0-a2);
+	  p2 = pow(2.0*a*(27.0 + a2*(18.0*a2 - 13.0)  - p1), 1.0/3.0);
+	  r = (-4.0*a + a2*(3.0*a2 - 19.0)/p2 - p2)/(3.0*(a2 -1.0));
 	  break;
 	case (4):
-	  // Plummer (1911)
+	  // Plummer (1911) model
 	  r = 1.0/sqrt(pow(a,-2.0/3.0) - 1.0);		
 	  break;
 	}

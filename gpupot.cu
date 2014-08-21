@@ -56,7 +56,7 @@ extern "C" void calculate_potential(float *m, float *x, float *y, float *z,
   cudaMemcpy(phi_d,phi, sizeof(float)*N, cudaMemcpyHostToDevice); // Host -> Device
 
   compute_potential_gpu <<<((N+BLOCKSIZE-1))/BLOCKSIZE,BLOCKSIZE >>>(m_d,x_d, y_d, z_d, phi_d,N,N1);
-  cudaMemcpy(phi,phi_d, sizeof(float)*N, cudaMemcpyDeviceToHost); // Host -> Device
+  cudaMemcpy(phi,phi_d, sizeof(float)*N, cudaMemcpyDeviceToHost); // Device -> Host
     
   //Freeing memory
   cudaFree(m_d);

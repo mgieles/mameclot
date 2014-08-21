@@ -1,12 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "mameclot.h"
+//#include "mameclot.h"
 
 #define sqr(x) pow(x,2.0)
 
 void calculate_potential(float *m, float *x, float *y, float *z, float *phi, int N, int N1);
-
 void calculate_potential(float *m, float *x, float *y, float *z, float *phi, int N, int N1)
 {
   // Calculates specific potential of a cluster (N1 = 0) or a cluster pair (0 < N1 < N)
