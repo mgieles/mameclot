@@ -66,6 +66,7 @@ void parameter_use()
   fprintf(stderr,"          -a Osipkov-Merritt anisotropy radius in units of r_0 [999] \n");
   fprintf(stderr,"          -c Cut-off radius in units of r_h [20] \n");
   fprintf(stderr,"          -r Physical scale in pc [1] \n");
+  fprintf(stderr,"          -u Upper mass in Msun [100] \n");
   fprintf(stderr,"          -d Distance between 2 clusters in N-body units [20] \n");
   fprintf(stderr,"          -E Dimensionless orbital energy of two-cluster system [0] \n");
   fprintf(stderr,"          -L Dimensionless orbital angular momentum two-cluster system [4]\n");  
@@ -128,6 +129,17 @@ void parameter_check(INPUT *parameters){
     fprintf(stderr," *** \n *** Input error: IMF type must be 0 or 1 \n *** \n");
     exit (0);
   }
+
+  // Check upper mass
+  if (parameters->mup < 0.5){
+    fprintf(stderr," *** \n *** Input error: Upper mass must be > 0.5 Msun \n *** \n");
+    exit (0);
+  }
+
+  if ((parameters->mup != 100)||(parameters->imftype==0)){
+    fprintf(stderr," *** \n *** Warning: no IMF set, upper mass ignored \n *** \n");
+  }
+
   if (parameters->model <= 2)
     parameters->gamma = parameters->model;
   
@@ -169,6 +181,7 @@ void get_args(int argc, char** argv, INPUT *parameters)
   parameters->frot    = 1;  
   parameters->ra      = 999;  
   parameters->imftype = 0;  // 0=equal mass; 1=Kroupa (2001)
+  parameters->mup     = 100.0; //Msun
   parameters->seed    = 0;  // pc  
   parameters->rbar    = 1;  // pc
   parameters->q       = 0;  
@@ -214,6 +227,8 @@ void get_args(int argc, char** argv, INPUT *parameters)
 	break;
       case 'r': parameters->rbar = atof(argv[++i]);
 	break;
+      case 'u': parameters->mup = atof(argv[++i]);
+	break;
       case 'h': parameter_use();
 	break;
       case 'H': parameter_use();
@@ -257,6 +272,7 @@ void initialize(SYSTEM **system, INPUT parameters)
   (*system)->clusters[0].M = 1.0;
   (*system)->clusters[0].id = 0;
   (*system)->clusters[0].imftype = parameters.imftype;
+  (*system)->clusters[0].mup = parameters.mup;
   (*system)->clusters[0].rvir = 1.0;
   (*system)->clusters[0].rcut = parameters.rcut;
   (*system)->clusters[0].ra = parameters.ra;
@@ -379,6 +395,7 @@ void initialize(SYSTEM **system, INPUT parameters)
       (*system)->clusters[1].N = parameters.N2;
       (*system)->d = parameters.d;
       (*system)->clusters[1].imftype = parameters.imftype;
+      (*system)->clusters[1].mup = parameters.mup;
       (*system)->clusters[1].id = 1;
       (*system)->clusters[1].model = parameters.model;
       (*system)->clusters[1].gamma = parameters.gamma;
@@ -502,7 +519,7 @@ void imf(CLUSTER *cluster)
   int i, nrem;
   double zm, m, mrem, mtot;
   double c[12], mass[cluster->N];
-  double mup = 100; // fixed for the moment
+  double mup = cluster->mup; // fixed for the moment
   
   switch (cluster->imftype)
     {
@@ -557,7 +574,7 @@ void imf(CLUSTER *cluster)
 	  mass[i] = zm;
 	  m += zm;
 	}
-      // Assign remaining mass to last star to get exact M=mN
+      // Assign remaining mass to last star to get exactly M=mN
       mass[i] = mtot - m;
       m = mtot;
       // Sort and assign
@@ -1069,6 +1086,7 @@ double Lz(SYSTEM *system)
 /*************************************************/
 double dawson(double x) 
 {
+  // Computes the Dawson integral
   int i,n0;
   double H = 0.4;
   double A1 = 2.0/3.0;
@@ -1156,6 +1174,8 @@ void output(SYSTEM *system)
 	      
       fprintf(stderr,"     N          = %11i \n",cluster->N); 
       fprintf(stderr,"     M          = %11.3f / %11.3f Msun\n",cluster->M,cluster->M * system->mstar);
+      if (cluster->imftype==1)
+	fprintf(stderr,"     m_up       = %11.3f Msun \n",cluster->mup);
       fprintf(stderr,"     r_vir      = %11.3f / %11.3f pc \n",cluster->rvir, cluster->rvir * system->rstar);
       fprintf(stderr,"     r_h        = %11.3f / %11.3f pc \n",r_h,r_h*system->rstar);
       fprintf(stderr,"     rho_h      = %11.3f / %11.3f Msun/pc3 \n",rho_h, rho_h*system->mstar/cube(system->rstar));
