@@ -136,7 +136,7 @@ void parameter_check(INPUT *parameters){
     exit (0);
   }
 
-  if ((parameters->mup != 100)||(parameters->imftype==0)){
+  if ((parameters->mup != 100)&&(parameters->imftype==0)){
     fprintf(stderr," *** \n *** Warning: no IMF set, upper mass ignored \n *** \n");
   }
 
