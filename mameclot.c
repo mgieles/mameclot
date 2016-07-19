@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <math.h>
 #include <string.h>
 #include <time.h>
@@ -173,23 +174,24 @@ void get_args(int argc, char** argv, INPUT *parameters)
 {
 
   // User defined parameters
-  parameters->N       = 10000;  
-  parameters->N2      = 0;  
-  parameters->model   = 3; //  0=Cored gamma-model; 1=Hernquist; 2=Jaffe; 3=Isochrone; 4=Plummer; 
+  parameters->N         = 10000;  
+  parameters->N2        = 0;  
+  parameters->model     = 3; //  0=Cored gamma-model; 1=Hernquist; 2=Jaffe; 3=Isochrone; 4=Plummer; 
 
-  parameters->spin    = 0;  
-  parameters->frot    = 1;  
-  parameters->ra      = 999;  
-  parameters->imftype = 0;  // 0=equal mass; 1=Kroupa (2001)
-  parameters->mup     = 100.0; //Msun
-  parameters->seed    = 0;  // pc  
-  parameters->rbar    = 1;  // pc
-  parameters->q       = 0;  
-  parameters->eta     = 0.333;  
-  parameters->d       = 20;  
-  parameters->rcut    = 20;  
-  parameters->Ehat    = 0;  
-  parameters->Lhat    = 4;  
+  parameters->print_phi = false;
+  parameters->spin      = 0;  
+  parameters->frot      = 1;  
+  parameters->ra        = 999;  
+  parameters->imftype   = 0;  // 0=equal mass; 1=Kroupa (2001)
+  parameters->mup       = 100.0; //Msun
+  parameters->seed      = 0;  // pc  
+  parameters->rbar      = 1;  // pc
+  parameters->q         = 0;  
+  parameters->eta       = 0.333;  
+  parameters->d         = 20;  
+  parameters->rcut      = 20;  
+  parameters->Ehat      = 0;  
+  parameters->Lhat      = 4;  
   
   // Non user defined parameters
   parameters->gamma  = 0; //  Only used for model<=2
@@ -224,6 +226,8 @@ void get_args(int argc, char** argv, INPUT *parameters)
       case 's': parameters->seed = atof(argv[++i]);
 	break;
       case 'm': parameters->model = atoi(argv[++i]);
+	break;
+      case 'p': parameters->print_phi = true;
 	break;
       case 'r': parameters->rbar = atof(argv[++i]);
 	break;
@@ -272,6 +276,7 @@ void initialize(SYSTEM **system, INPUT parameters)
   (*system)->clusters[0].M = 1.0;
   (*system)->clusters[0].id = 0;
   (*system)->clusters[0].imftype = parameters.imftype;
+  (*system)->clusters[0].print_phi = parameters.print_phi;
   (*system)->clusters[0].mup = parameters.mup;
   (*system)->clusters[0].rvir = 1.0;
   (*system)->clusters[0].rcut = parameters.rcut;
@@ -1224,15 +1229,28 @@ void output(SYSTEM *system)
     {
       cluster = &system->clusters[i];  
       for (int j=0;j<cluster->N;j++){
-	printf("%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e  \n",
-      	       cluster->stars[j].mass,
-	       (cluster->stars[j].pos[0] + cluster->compos[0])*system->rfac,
-	       (cluster->stars[j].pos[1] + cluster->compos[1])*system->rfac,
-	       (cluster->stars[j].pos[2] + cluster->compos[2])*system->rfac,
-	       (cluster->stars[j].vel[0] + cluster->comvel[0])*system->vfac,
-	       (cluster->stars[j].vel[1] + cluster->comvel[1])*system->vfac,
-	       (cluster->stars[j].vel[2] + cluster->comvel[2])*system->vfac);
-	       //	       (cluster->stars[j].phi+cluster->stars[j].kin)*pow(system->rfac/system->vfac,2.0)); 
+	if (cluster->print_phi)
+	  {
+	    printf("%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e  %18.10e\n",
+		   cluster->stars[j].mass,
+		   (cluster->stars[j].pos[0] + cluster->compos[0])*system->rfac,
+		   (cluster->stars[j].pos[1] + cluster->compos[1])*system->rfac,
+		   (cluster->stars[j].pos[2] + cluster->compos[2])*system->rfac,
+		   (cluster->stars[j].vel[0] + cluster->comvel[0])*system->vfac,
+		   (cluster->stars[j].vel[1] + cluster->comvel[1])*system->vfac,
+		   (cluster->stars[j].vel[2] + cluster->comvel[2])*system->vfac,
+		   (cluster->stars[j].phi*pow(system->rfac/system->vfac,2.0))); 
+	  }else
+	  {
+	    printf("%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e  \n",
+		   cluster->stars[j].mass,
+		   (cluster->stars[j].pos[0] + cluster->compos[0])*system->rfac,
+		   (cluster->stars[j].pos[1] + cluster->compos[1])*system->rfac,
+		   (cluster->stars[j].pos[2] + cluster->compos[2])*system->rfac,
+		   (cluster->stars[j].vel[0] + cluster->comvel[0])*system->vfac,
+		   (cluster->stars[j].vel[1] + cluster->comvel[1])*system->vfac,
+		   (cluster->stars[j].vel[2] + cluster->comvel[2])*system->vfac);
+	  }
       }
     }  
 
