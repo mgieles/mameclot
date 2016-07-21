@@ -1239,7 +1239,7 @@ void output(SYSTEM *system)
 		   (cluster->stars[j].vel[0] + cluster->comvel[0])*system->vfac,
 		   (cluster->stars[j].vel[1] + cluster->comvel[1])*system->vfac,
 		   (cluster->stars[j].vel[2] + cluster->comvel[2])*system->vfac,
-		   (cluster->stars[j].phi*pow(system->rfac/system->vfac,2.0))); 
+		   (cluster->stars[j].phi*pow(system->vfac,2.0))); 
 	  }else
 	  {
 	    printf("%18.10e   %18.10e %18.10e %18.10e   %18.10e %18.10e %18.10e  \n",
