@@ -67,6 +67,7 @@ void parameter_use()
   fprintf(stderr,"          -a Osipkov-Merritt anisotropy radius in units of r_0 [999] \n");
   fprintf(stderr,"          -c Cut-off radius in units of r_h [20] \n");
   fprintf(stderr,"          -r Physical scale in pc [1] \n");
+  fprintf(stderr,"          -S Mass segregate with prescription of Baumgardt et al. 2008 [False] \n");
   fprintf(stderr,"          -u Upper mass in Msun [100] \n");
   fprintf(stderr,"          -d Distance between 2 clusters in N-body units [20] \n");
   fprintf(stderr,"          -E Dimensionless orbital energy of two-cluster system [0] \n");
@@ -116,6 +117,12 @@ void parameter_check(INPUT *parameters){
   // Check d
   if (parameters->d <= 0){
     fprintf(stderr," *** \n *** Warning: d must be positive \n *** \n");
+    exit (0);
+  }
+
+  // Check segregation -S
+  if ((parameters->segregate)&&(parameters->imftype==0)){
+    fprintf(stderr," *** \n *** Input error: mass function required for segregation \n *** \n");
     exit (0);
   }
   
@@ -168,6 +175,11 @@ double myrand()
 {
   return rand()/((double)RAND_MAX + 1.0);
 }
+/*************************************************/
+int myrandint(int min, int max) {
+  return (rand() % (max-min)) + min;
+}
+
 
 /*************************************************/
 void get_args(int argc, char** argv, INPUT *parameters)
@@ -190,6 +202,7 @@ void get_args(int argc, char** argv, INPUT *parameters)
   parameters->eta       = 0.333;  
   parameters->d         = 20;  
   parameters->rcut      = 20;  
+  parameters->segregate = false;  
   parameters->Ehat      = 0;  
   parameters->Lhat      = 4;  
   
@@ -231,6 +244,8 @@ void get_args(int argc, char** argv, INPUT *parameters)
 	break;
       case 'r': parameters->rbar = atof(argv[++i]);
 	break;
+      case 'S': parameters->segregate = true;
+	break;
       case 'u': parameters->mup = atof(argv[++i]);
 	break;
       case 'h': parameter_use();
@@ -256,6 +271,9 @@ void allocate_memory(SYSTEM **system, INPUT *parameters)
   for (int i = 0; i < parameters->Ncl; ++i){
     if (i==0)
       (*system)->clusters[i].stars = calloc(parameters->N, sizeof(*stars));
+
+    // TBD memory for mass segregated system
+    
     if (i==1)
       (*system)->clusters[i].stars = calloc(parameters->N2, sizeof(*stars));
   }
@@ -284,6 +302,9 @@ void initialize(SYSTEM **system, INPUT parameters)
   (*system)->clusters[0].vrms = 1.0/sqrt(2.0);
   (*system)->clusters[0].model = parameters.model;
   (*system)->clusters[0].gamma = parameters.gamma;
+  (*system)->clusters[0].segregate = parameters.segregate;
+
+
   strcpy((*system)->clusters[0].name, parameters.name);
 
   if ((fabs(parameters.spin)>=1)&&(fabs(parameters.spin)<=3))
@@ -406,6 +427,7 @@ void initialize(SYSTEM **system, INPUT parameters)
       (*system)->clusters[1].gamma = parameters.gamma;
       (*system)->clusters[1].ra = parameters.ra;
       (*system)->clusters[1].rcut = parameters.rcut;
+      (*system)->clusters[1].segregate = parameters.segregate;
 
       if ((fabs(parameters.spin)==1)||(parameters.spin==4))
 	(*system)->clusters[1].spin = sign(parameters.spin);
@@ -584,6 +606,7 @@ void imf(CLUSTER *cluster)
       m = mtot;
       // Sort and assign
       shell(mass,cluster->N);
+
       for (i=0; i<cluster->N; i++){
 	cluster->stars[i].mass=mass[i]*cluster->M/mtot;
       }      
@@ -591,63 +614,167 @@ void imf(CLUSTER *cluster)
 }
 
 /*************************************************/
+void single_pos_vel(double pos[3], double vel[3], double rmax_over_r0, double ra, int model)
+{
+  double r, r2, v, eta, v2, a[5];
+  double vr, vt,  vtheta, vphi, theta, phi;
+
+  for (int j=0;j<5;j++)
+    a[j]=myrand();
+      
+  // Position
+  r = get_r(rmax_over_r0, model);
+  r2 = sqr(r);
+
+  pos[0] = (1.0 - 2.0*a[0])*r;
+  pos[1] = sqrt(r2 - sqr(pos[0]))*cos(TWOPI*a[1]);
+  pos[2] = sqrt(r2 - sqr(pos[0]))*sin(TWOPI*a[1]);
+      
+      
+  // Velocity
+  if (ra >= 999){
+    // Isotropic 
+    v = get_v(r, model);
+    v2 = sqr(v);
+	
+    vel[0] = (1.0 - 2.0*a[2])*v;
+    vel[1] = sqrt(v2 - sqr(vel[0]))*cos(TWOPI*a[3]);
+    vel[2] = sqrt(v2 - sqr(vel[0]))*sin(TWOPI*a[3]);
+  }
+  else{
+    // Anisotropic Osipkov-Merritt model 
+    get_osipkov_merrit_v_eta(r, ra, model, &v, &eta);
+    v2 = sqr(v);
+
+    // Create spherical velocity coordinates:
+    vt = v*sin(eta);
+    vphi = vt*cos(TWOPI*a[4]);
+    vtheta = vt*sin(TWOPI*a[4]);
+    vr = v*cos(eta);
+
+    // Convert to Cartesian velocity components
+    theta = acos(pos[2]/r);
+    phi = atan2(pos[1],pos[0]);
+    
+    vel[0] = vr*sin(theta)*cos(phi) + vtheta*cos(theta)*cos(phi) - vphi*sin(phi);
+    vel[1] = vr*sin(theta)*sin(phi) + vtheta*cos(theta)*sin(phi) + vphi*cos(phi);
+    vel[2] = vr*cos(theta) - vtheta*sin(theta);
+  }
+}
+/*************************************************/
+void get_analytic_phi(int model, double pos[3], double *phi)
+{
+  double p, r, r2; 
+
+  r2 = 0.0;
+  for (int k=0; k<3; k++)
+    r2 += sqr(pos[k]);
+
+  r = sqrt(r2);
+
+  switch (model)
+    {
+      // TBD: carefully check 
+    case (0): 
+      // Cored gamma=0 model (Dehnen 1993)
+      *phi = -0.5*(1.0+2.0*r)/sqr(1.0+r);
+      break;
+    case (1): 
+      // Hernquist (1990) model)
+      *phi = -1.0/(1.0+r);
+      break;
+    case (2): 
+      // Jaffe (1993) model)
+      *phi = log(1.0+1.0/r);
+      break;
+    case (3): 
+      // Henon (1959) "Isochrone" 
+      p = sqrt(1.0+r2);
+      *phi = -1.0/(1.0+p);
+      break;
+    case (4): 
+      // Plummer (1911) 
+      *phi = -1.0/sqrt(1.0+r2);
+      break;
+    }
+}
+
+
+/*************************************************/
 void get_pos_vel(CLUSTER *cluster)
 {
   // Sample positions and velocities. Total mass assumed to be 1 at this stage.
-  double r, r2, v, eta, v2, a[5], lz, R2;
-  double vr, vt,  vtheta, vphi, theta, phi;
-
+  double pos[3], vel[3], lz, R2, v2;
+  int idmin, idmax;
   cluster->Lz = 0.0;
   cluster->Krot = 0.0;
 
   for (int i=0; i<cluster->N; i++)
     {
-      for (int j=0;j<5;j++)
-	a[j]=myrand();
-    
-      // Position
-      r = get_r(cluster);
-      r2 = sqr(r);
+      single_pos_vel(pos, vel, cluster->rmax_over_r0, cluster->ra, cluster->model);
 
-      cluster->stars[i].pos[0] = (1.0 - 2.0*a[0])*r;
-      cluster->stars[i].pos[1] = sqrt(r2 - sqr(cluster->stars[i].pos[0]))*cos(TWOPI*a[1]);
-      cluster->stars[i].pos[2] = sqrt(r2 - sqr(cluster->stars[i].pos[0]))*sin(TWOPI*a[1]);
+      for (int k=0; k<3; k++)
+	{
+	  cluster->stars[i].pos[k] = pos[k];
+	  cluster->stars[i].vel[k] = vel[k];
+	}
+    }
+
+  // Add mass segregation following Baumgardt et al. 2008 (Appendix) recipe 
+  // !! Implemented Jan 20 2017, some testing would be good !!
+  if (cluster->segregate)
+    {
+      int Np = 10*cluster->N;
+      STAR *temp_stars;
+      STAR *stars = malloc(sizeof(STAR));
+
+      double *cmass = (double *)malloc((cluster->N+1)*sizeof(double));
+      //      double cmass[cluster->N+1];
       
+      temp_stars = calloc(Np, sizeof(*stars)); // TBD: Can be done at start?
+      
+      // Generate 30 times more particles to sample from
+      for (int i=0; i<Np; i++)
+	{
+	  single_pos_vel(temp_stars[i].pos, temp_stars[i].vel, cluster->rmax_over_r0, \
+			 cluster->ra, cluster->model);
+	  get_analytic_phi(cluster->model, temp_stars[i].pos, &temp_stars[i].phi);
+	  temp_stars[i].E = temp_stars[i].phi + 0.5*vec_sqr(temp_stars[i].vel);
+	}
+      
+      // Sort stars array by energy
+      shell_stars_E(temp_stars, Np); 
+      
+      // Make cumulative mass array
+      cmass[0] = 0.0; 
+      cmass[1] = cluster->stars[0].mass;
+      for (int i=1; i<cluster->N; i++)
+	cmass[i+1] = cmass[i]+ cluster->stars[i].mass;
+      
+      // Pick particles based on energy
+      for (int i=0; i<cluster->N; i++)
+	{
+	  idmin = Np*cmass[i];
+	  idmax = Np*cmass[i+1];
+	  int ii = myrandint(idmin, idmax);
+	  temp_stars[ii].mass = cluster->stars[i].mass;
+	  cluster->stars[i] = temp_stars[ii];
+	}
+      free(temp_stars);
+    }
+  
+  // Continue ...
+  for (int i=0; i<cluster->N; i++)
+    {
       for (int k=0; k<3; k++)
 	cluster->compos[k] += cluster->stars[i].mass * cluster->stars[i].pos[k];
-      
-      // Velocity
-      if (cluster->ra >= 999){
-	// Isotropic 
-	v = get_v(r,cluster->model);
-	v2 = sqr(v);
-	
-	cluster->stars[i].vel[0] = (1.0 - 2.0*a[2])*v;
-	cluster->stars[i].vel[1] = sqrt(v2 - sqr(cluster->stars[i].vel[0]))*cos(TWOPI*a[3]);
-	cluster->stars[i].vel[2] = sqrt(v2 - sqr(cluster->stars[i].vel[0]))*sin(TWOPI*a[3]);
-      }
-      else{
-	// Anisotropic Osipkov-Merritt model 
-	get_osipkov_merrit_v_eta(r, cluster->ra, cluster->model, &v, &eta);
-	v2 = sqr(v);
 
-	// Create spherical velocity coordinates:
-	vt = v*sin(eta);
-	vphi = vt*cos(TWOPI*a[4]);
-	vtheta = vt*sin(TWOPI*a[4]);
-	vr = v*cos(eta);
-
-	// Convert to Cartesian velocity components
-	theta = acos(cluster->stars[i].pos[2]/r);
-	phi = atan2(cluster->stars[i].pos[1],cluster->stars[i].pos[0]);
-
-	cluster->stars[i].vel[0] = vr*sin(theta)*cos(phi) + vtheta*cos(theta)*cos(phi) - vphi*sin(phi);
-	cluster->stars[i].vel[1] = vr*sin(theta)*sin(phi) + vtheta*cos(theta)*sin(phi) + vphi*cos(phi);
-	cluster->stars[i].vel[2] = vr*cos(theta) - vtheta*sin(theta);
-      }
-      
+      v2 = 0.0;
       for (int k=0; k<3; k++)
-	cluster->comvel[k] += cluster->stars[i].mass * cluster->stars[i].vel[k];
+	{
+	  v2 += sqr(cluster->stars[i].vel[k]);
+	  cluster->comvel[k] += cluster->stars[i].mass * cluster->stars[i].vel[k];
+	}
 
       cluster->stars[i].kin = 0.5*cluster->stars[i].mass*v2;      
 
@@ -669,6 +796,7 @@ void get_pos_vel(CLUSTER *cluster)
       R2 = pow(cluster->stars[i].pos[0],2.0) + pow(cluster->stars[i].pos[1],2.0);
       cluster->Krot += cluster->stars[i].mass*lz/sqrt(R2);
     }  
+
   // Krot = 0.5*M*<v_phi>^2
   cluster->Krot = 0.5*pow(cluster->Krot,2.0);  
 }
@@ -676,15 +804,15 @@ void get_pos_vel(CLUSTER *cluster)
 
 
 /*************************************************/
-double get_r(CLUSTER *cluster)
+double get_r(double rmax_over_r0, int model)
 {
   double r, a, a2, p1, p2;
   
-  r=2.0*cluster->rmax_over_r0;
-  while (r > cluster->rmax_over_r0)
+  r=2.0*rmax_over_r0;
+  while (r > rmax_over_r0)
     {
       a=myrand();    
-      switch (cluster->model)
+      switch (model)
 	{
 	case(0):
 	  // Cored gamma=0 model (Dehnen 1993)
@@ -693,7 +821,7 @@ double get_r(CLUSTER *cluster)
 	  break;
 	case (1):
 	  // Hernquist (1990) model
-	  r = (-a-sqrt(sqr(a)-a*(a-1.0)))/(a-1.0);
+	  r = (a+sqrt(a))/(1.0-a);
 	  break;
 	case (2):
 	  // Jaffe (1993) model
@@ -720,9 +848,12 @@ double get_r(CLUSTER *cluster)
 
 	  // Simpler and safer?
 	  a2 = sqr(a);	
-	  p1 = 1.5*sqrt(3.0)*(a-1.0)*(a+1.0)*(2.0+a2)*sqrt(27.0-a2);
-	  p2 = pow(2.0*a*(27.0 + a2*(18.0*a2 - 13.0)  - p1), 1.0/3.0);
-	  r = (-4.0*a + a2*(3.0*a2 - 19.0)/p2 - p2)/(3.0*(a2 -1.0));
+	  //	  p1 = 1.5*sqrt(3.0)*(a2-1.0)*(2.0+a2)*sqrt(27.0-a2);
+	  //	  p2 = pow(2.0*a*(27.0 + a2*(18.0*a2 - 13.0)  - p1), 1.0/3.0);
+	  //	  p2 = pow(2.0*a*(27.0 - 1.5*sqrt(81.0-3.0*a2)*(a2-1.0)*(2.0+a2) + a2*(18.0*a2-13.0)),1.0/3.0);
+	  p2 = pow(2.0*a*(27.0 - 1.5*sqrt(81.0-3.0*a2)*(a2*a2+a2-2.0) + a2*(18.0*a2-13.0)),1.0/3.0);
+	  //	  r = (-4.0*a + a2*(3.0*a2 - 19.0)/p2 - p2)/(3.0*(a2 -1.0));
+	  r = (4.0*a - a2*(3.0*a2 - 19.0)/p2 + p2)/(3.0*(1.0-a2));
 	  break;
 	case (4):
 	  // Plummer (1911) model
@@ -767,8 +898,7 @@ double get_v(double r, int model)
 	vesc2 = 2.0/(1.0+r);
 	E = 0.5*vesc2*(1.0-q2);  
 	E2 = sqr(E);
-	
-	df = 3.0*asin(sqrt(E)) + sqrt(E*(1.0-E))*(1.0-2.0*E)*(8.0*E2-8.0*E-3.0);
+	df = 3.0*asin(sqrt(E)) + sqrt(E*(1.0-E)) * (1.0-2.0*E) * (8.0*E2-8.0*E-3.0);
 	df *= pow(1.0-E,-2.5);
 	gmax = 2.5*pow(r,-1.5)*pow(1+0.3*r2,-1.0);
 	break;
@@ -849,8 +979,18 @@ void get_osipkov_merrit_v_eta(double r, double ra, int model, double *v, double 
 	vesc2 = 2.0/(1.0+r);
 	Q = 0.5*vesc2*(1.0 - q2 - qt2*r2/ra2);  
 	Q2 = sqr(Q);
-	df = 3.0*asin(sqrt(Q)) + sqrt(Q*(1.0-Q))*(1.0-2.0*Q)*(8.0*Q2-8.0*Q-3.0+8.0*sqr(1.0-Q)/ra2);
+
+	/*
+	df = 3.0*asin(sqrt(Q)) + sqrt(Q*(1.0-Q)) * (1.0-2.0*Q) * (8.0*Q2-8.0*Q-3.0+8.0*sqr(1.0-Q)/ra2);
 	df *= pow(1.0-Q,-2.5);
+
+	*/
+
+	// Write as isotropic DF + additional term
+	df = 3.0*asin(sqrt(Q)) + sqrt(Q*(1.0-Q)) * (1.0-2.0*Q) * (8.0*Q2-8.0*Q-3.0);
+	df *= pow(1.0-Q,-2.5);
+	df += 8.0*sqrt(Q)*(1.0-2.0*Q)/ra2;
+
 	gmax = 2.5*pow(r,-1.5)*pow(1+0.025*r2,-1.0);
 	break;
       case (2):
@@ -869,10 +1009,19 @@ void get_osipkov_merrit_v_eta(double r, double ra, int model, double *v, double 
 	vesc2 = 2.0/(1.0+sqrt(1.0+r2));  
 	Q = 0.5*vesc2*(1.0 - q2 - qt2*r2/ra2);  
 	Q2 = sqr(Q);
-	df = 27.0+77.0/ra2 - (66.0+286.0/ra2)*Q + (320.0+136.0/ra2)*Q2;
+
+	/*
+	df = 27.0 + 77.0/ra2 - (66.0+286.0/ra2)*Q + (320.0+136.0/ra2)*Q2;
 	df += -(240.0+32.0/ra2)*Q2*Q + 64.0*Q2*Q2;
 	df += 3.0*((16.0-8.0/ra2)*Q2 + (28.0-44.0/ra2)*Q-9.0+17.0/ra2)*asin(sqrt(Q))/sqrt(Q*(1.0-Q));
 	df *= sqrt(Q)/pow(1.0-Q,4.0);
+	*/
+	// Write as isotropic DF + extra term
+	df = 27.0  - 66.0*Q + 320.0*Q2  -240.0*Q2*Q + 64.0*Q2*Q2;
+	df += 3.0*((16.0-8.0/ra2)*Q2 + (28.0-44.0/ra2)*Q-9.0+17.0/ra2)*asin(sqrt(Q))/sqrt(Q*(1.0-Q));
+	df *= sqrt(Q)/pow(1.0-Q,4.0);
+
+	df += ((77.0+286.0*Q + 136.0*Q2)/ra2 +32.0*Q2/ra2  )*sqrt(Q)/pow(1.0-Q,4.0);
 	gmax = 60.0*pow(1.0+0.15*r2,-1.75);
 	break;
       case (4):
@@ -880,6 +1029,7 @@ void get_osipkov_merrit_v_eta(double r, double ra, int model, double *v, double 
 	// Anisotropic DF: equation (45) in Merritt (1985)
 	vesc2 = 2.0/sqrt(1.0+r2);
 	Q = 0.5*vesc2*(1.0 - q2 - qt2*r2/ra2);  
+
 	df = pow(Q,3.5)*( (1.0 - 1.0/ra2) + (63.0/144.0)*pow(Q,-2.0)/ra2);
 	gmax = 0.22*pow(1+0.3*r2,-2.25);
 	break;
@@ -960,6 +1110,8 @@ void scale(CLUSTER *cluster)
     }
     cluster->W += 0.5*cluster->stars[i].mass*cluster->stars[i].phi;
   }
+
+
 
   rfac = -cluster->W/(cluster->M*sqr(cluster->vrms));
   vfac = sqrt(0.5*cluster->M*sqr(cluster->vrms)/cluster->K);
@@ -1124,6 +1276,17 @@ double dawson(double x)
   }
   return ans; 
 }
+/*************************************************/
+double vec_sqr(double x[3])
+{
+  double square = 0.0;
+
+  for (int k=0; k<3; k++)
+    square += x[k]*x[k];
+      
+  return square;
+}
+
 
 /*************************************************/
 void shell(double a[], int n)
@@ -1159,16 +1322,49 @@ void shell(double a[], int n)
 }
 
 /*************************************************/
+void shell_stars_E(STAR *stars, int n)
+{
+  // Sort array of stars in energy, most negative first
+  int i,j,inc; 
+  double v;
+  STAR vstar;
+  inc = 1;
+  
+  do {
+    inc *= 3;
+    inc++;
+  } while (inc <= n); 
+  do {
+    inc /= 3;
+    for (i=inc;i<n;i++) {
+      v=stars[i].E;
+      vstar = stars[i];
+      j=i;
+      while (stars[j-inc].E > v) {
+	stars[j] =stars[j-inc];
+
+	j -= inc;
+	if (j < inc) break;
+      }
+      stars[j]=vstar; 
+    }
+  } while (inc >= 1);
+  
+}
+
+/*************************************************/
 void output(SYSTEM *system)
 {
   CLUSTER *cluster;
   fprintf(stderr," N clusters = %7i \n",system->Ncl);
   fprintf(stderr," N stars    = %7i \n",system->N);
   
+  if (system->clusters[0].segregate)
+    fprintf(stderr," Mass segregation following Baumgardt et al. 2008, ApJ, 685, 247\n");
+
   fprintf(stderr,"\n CLUSTER PROPERTIES: \n");
   for (int i=0; i<system->Ncl; i++)
     { 
-
       cluster = &system->clusters[i];  
       double r_h = cluster->rvir*cluster->rh_over_rv;
       double rho_h = 3.0*cluster->M/(8.0*PI*cube(r_h));
@@ -1294,7 +1490,7 @@ int main(int argc, char** argv)
 {
   SYSTEM *system = NULL;
   INPUT parameters;
-  
+
   get_args(argc, argv, &parameters);   
   allocate_memory(&system, &parameters);
   initialize(&system, parameters);

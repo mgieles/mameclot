@@ -12,9 +12,13 @@ void calculate_potential(float *m, float *x, float *y, float *z, float *phi, int
   double d2;
   for (int i=0; i < (N1 == 0 ? N : N1); i++){
     for (int j = (N1 == 0 ? i + 1 : N1); j < N; j++){
+
       d2 = sqr(x[i]-x[j]) +  sqr(y[i]-y[j]) +  sqr(z[i]-z[j]);
       phi[i] -= m[j]/sqrt(d2);
       phi[j] -= m[i]/sqrt(d2);
+      if (d2==0)
+	fprintf(stderr," D = 0!! %i %i %8.5f %8.5f  %8.5f   %8.5f %8.5f  %8.5f  %8.5f  \n", i, j, x[i], y[i], z[i], x[j], y[j], z[j], d2); 
+
     }   
   }
 }

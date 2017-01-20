@@ -6,6 +6,7 @@ typedef struct input{
   int model;
   int imftype; // 0=equal mass; 1=Kroupa (2001)
   bool print_phi;
+  bool segregate;
   float mup;
   int spin;
   float frot;
@@ -23,7 +24,7 @@ typedef struct input{
 
 typedef struct star{
   double mass;
-  double kin, phi;
+  double kin, phi, E;
   double pos[3];
   double vel[3];
 } STAR;
@@ -53,6 +54,7 @@ typedef struct cluster{
   double vrms; 
   double rvir; 
   double rcut; 
+  bool segregate; 
   double M; 
   double mmean; //Msun
   double trh; 
@@ -90,6 +92,7 @@ typedef struct system{
 } SYSTEM;
 
 double myrand();
+int myrandint(int, int);
 void get_args(int argc, char* argv[], INPUT *parameters);
 void parameter_use();
 void parameter_check(INPUT *parameters);
@@ -98,8 +101,10 @@ void initialize(SYSTEM **system,  INPUT parameters);
 void create(SYSTEM **system);
 void set_scalings(CLUSTER *cluster);
 void imf(CLUSTER *cluster);
+void single_pos_vel(double pos[3], double vel[3], double, double, int);
 void get_pos_vel(CLUSTER *cluster);
-double get_r(CLUSTER *cluster);
+void get_analytic_phi(int model, double pos[3], double *phi);
+double get_r(double, int);
 double get_v(double r, int model);
 void get_osipkov_merrit_v_eta(double r, double ra,int model, double *v, double *eta);
 void get_q_eta_pair(double p, double *q, double *eta);
@@ -110,6 +115,8 @@ extern void calculate_potential();
 extern void calculate_cross_potential();
 void twobody_orbit(SYSTEM *system);
 double dawson(double x);
-void shell(double a[], int n);
+double vec_sqr(double a[3]);
+void shell(double a[],  int n);
+void shell_stars_E(STAR *stars,int n);
 void output(SYSTEM *system);
 void free_memory(SYSTEM *system);
