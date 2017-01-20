@@ -471,7 +471,9 @@ void create(SYSTEM **system)
     set_scalings(cluster);
     imf(cluster);
     get_pos_vel(cluster);
+
     scale(cluster); 
+
   }
 
   // Add orbital motion and compute total angular momentum
@@ -709,6 +711,7 @@ void get_pos_vel(CLUSTER *cluster)
   cluster->Lz = 0.0;
   cluster->Krot = 0.0;
 
+
   for (int i=0; i<cluster->N; i++)
     {
       single_pos_vel(pos, vel, cluster->rmax_over_r0, cluster->ra, cluster->model);
@@ -720,19 +723,17 @@ void get_pos_vel(CLUSTER *cluster)
 	}
     }
 
+
+
   // Add mass segregation following Baumgardt et al. 2008 (Appendix) recipe 
   // !! Implemented Jan 20 2017, some testing would be good !!
   if (cluster->segregate)
     {
-      int Np = 10*cluster->N;
-      STAR *temp_stars;
-      STAR *stars = malloc(sizeof(STAR));
+      int Np = 20*cluster->N;
+      STAR *temp_stars = calloc(Np, sizeof(STAR)); // TBD: Can be done at start?
 
-      double *cmass = (double *)malloc((cluster->N+1)*sizeof(double));
-      //      double cmass[cluster->N+1];
-      
-      temp_stars = calloc(Np, sizeof(*stars)); // TBD: Can be done at start?
-      
+      double *cmass = malloc((cluster->N+1)*sizeof(double));
+
       // Generate 30 times more particles to sample from
       for (int i=0; i<Np; i++)
 	{
@@ -744,13 +745,15 @@ void get_pos_vel(CLUSTER *cluster)
       
       // Sort stars array by energy
       shell_stars_E(temp_stars, Np); 
-      
+
       // Make cumulative mass array
+      // Note division by cluster->M to give range between 0 and 1
       cmass[0] = 0.0; 
-      cmass[1] = cluster->stars[0].mass;
+      cmass[1] = cluster->stars[0].mass/cluster->M;
       for (int i=1; i<cluster->N; i++)
-	cmass[i+1] = cmass[i]+ cluster->stars[i].mass;
-      
+	cmass[i+1] = cmass[i]+ cluster->stars[i].mass/cluster->M;
+
+
       // Pick particles based on energy
       for (int i=0; i<cluster->N; i++)
 	{
@@ -759,10 +762,14 @@ void get_pos_vel(CLUSTER *cluster)
 	  int ii = myrandint(idmin, idmax);
 	  temp_stars[ii].mass = cluster->stars[i].mass;
 	  cluster->stars[i] = temp_stars[ii];
+
 	}
+
       free(temp_stars);
+      free(cmass);
     }
-  
+
+
   // Continue ...
   for (int i=0; i<cluster->N; i++)
     {
