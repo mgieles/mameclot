@@ -687,7 +687,7 @@ void get_analytic_phi(int model, double pos[3], double *phi)
       break;
     case (2): 
       // Jaffe (1993) model)
-      *phi = log(1.0+1.0/r);
+      *phi = -log(1.0+1.0/r);
       break;
     case (3): 
       // Henon (1959) "Isochrone" 
