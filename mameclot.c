@@ -726,7 +726,7 @@ void get_pos_vel(CLUSTER *cluster)
 
 
   // Add mass segregation following Baumgardt et al. 2008 (Appendix) recipe 
-  // !! Implemented Jan 20 2017, some testing would be good !!
+  // !! Implemented Jan 20 2017, some additional testing would be good !!
   if (cluster->segregate)
     {
       int Np = 20*cluster->N;
@@ -734,7 +734,7 @@ void get_pos_vel(CLUSTER *cluster)
 
       double *cmass = malloc((cluster->N+1)*sizeof(double));
 
-      // Generate 30 times more particles to sample from
+      // Generate  more particles to sample from
       for (int i=0; i<Np; i++)
 	{
 	  single_pos_vel(temp_stars[i].pos, temp_stars[i].vel, cluster->rmax_over_r0, \
@@ -836,30 +836,8 @@ double get_r(double rmax_over_r0, int model)
 	  break;
 	case (3):
 	  // "Isochrone" model (Henon 1959)
-
-	  /*
-	  // Can be done quicker/easier?
-	  if (a>0.999999)
-	    a = 0.999999;
-
 	  a2 = sqr(a);	
-	  a4 = sqr(a2);
-	  a6 = a4*a2;
-
-	  p1 = a2*sqrt(a2+27.0)/(3.0*sqrt(3.0)*sqr(a2-1.0));
-	  p2 = (a6+36.0*a4+27.0*a2)/(27.0*a6-81.0*a4+81.0*a2-27.0);
-	  p3 = pow(p1-p2,1.0/3.0);
-	  p4 = p3+(a4+15.0*a2)/((9.0*a4-18.0*a2+9.0)*p3)-(a2+3.0)/(3.0*a2-3.0);
-	  r = sqrt(sqr(p4)-1.0);
-	  */
-
-	  // Simpler and safer?
-	  a2 = sqr(a);	
-	  //	  p1 = 1.5*sqrt(3.0)*(a2-1.0)*(2.0+a2)*sqrt(27.0-a2);
-	  //	  p2 = pow(2.0*a*(27.0 + a2*(18.0*a2 - 13.0)  - p1), 1.0/3.0);
-	  //	  p2 = pow(2.0*a*(27.0 - 1.5*sqrt(81.0-3.0*a2)*(a2-1.0)*(2.0+a2) + a2*(18.0*a2-13.0)),1.0/3.0);
 	  p2 = pow(2.0*a*(27.0 - 1.5*sqrt(81.0-3.0*a2)*(a2*a2+a2-2.0) + a2*(18.0*a2-13.0)),1.0/3.0);
-	  //	  r = (-4.0*a + a2*(3.0*a2 - 19.0)/p2 - p2)/(3.0*(a2 -1.0));
 	  r = (4.0*a - a2*(3.0*a2 - 19.0)/p2 + p2)/(3.0*(1.0-a2));
 	  break;
 	case (4):
@@ -987,12 +965,6 @@ void get_osipkov_merrit_v_eta(double r, double ra, int model, double *v, double 
 	Q = 0.5*vesc2*(1.0 - q2 - qt2*r2/ra2);  
 	Q2 = sqr(Q);
 
-	/*
-	df = 3.0*asin(sqrt(Q)) + sqrt(Q*(1.0-Q)) * (1.0-2.0*Q) * (8.0*Q2-8.0*Q-3.0+8.0*sqr(1.0-Q)/ra2);
-	df *= pow(1.0-Q,-2.5);
-
-	*/
-
 	// Write as isotropic DF + additional term
 	df = 3.0*asin(sqrt(Q)) + sqrt(Q*(1.0-Q)) * (1.0-2.0*Q) * (8.0*Q2-8.0*Q-3.0);
 	df *= pow(1.0-Q,-2.5);
@@ -1017,12 +989,6 @@ void get_osipkov_merrit_v_eta(double r, double ra, int model, double *v, double 
 	Q = 0.5*vesc2*(1.0 - q2 - qt2*r2/ra2);  
 	Q2 = sqr(Q);
 
-	/*
-	df = 27.0 + 77.0/ra2 - (66.0+286.0/ra2)*Q + (320.0+136.0/ra2)*Q2;
-	df += -(240.0+32.0/ra2)*Q2*Q + 64.0*Q2*Q2;
-	df += 3.0*((16.0-8.0/ra2)*Q2 + (28.0-44.0/ra2)*Q-9.0+17.0/ra2)*asin(sqrt(Q))/sqrt(Q*(1.0-Q));
-	df *= sqrt(Q)/pow(1.0-Q,4.0);
-	*/
 	// Write as isotropic DF + extra term
 	df = 27.0  - 66.0*Q + 320.0*Q2  -240.0*Q2*Q + 64.0*Q2*Q2;
 	df += 3.0*((16.0-8.0/ra2)*Q2 + (28.0-44.0/ra2)*Q-9.0+17.0/ra2)*asin(sqrt(Q))/sqrt(Q*(1.0-Q));

@@ -49,6 +49,8 @@
           -a Osipkov-Merritt anisotropy radius in units of r_0 [999] 
           -c Cut-off radius in units of r_h [20] 
           -r Physical scale in pc [1] 
+          -S Mass segregate with prescription of Baumgardt et al. 2008 [False] 
+          -u Upper mass in Msun [100] 
           -d Distance between 2 clusters in N-body units [20] 
           -E Dimensionless orbital energy of two-cluster system [0] 
           -L Dimensionless orbital angular momentum two-cluster system [4]
