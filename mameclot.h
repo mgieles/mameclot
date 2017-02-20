@@ -6,7 +6,7 @@ typedef struct input{
   int model;
   int imftype; // 0=equal mass; 1=Kroupa (2001)
   bool print_phi;
-  bool segregate;
+  float fsegr;
   float mup;
   int spin;
   float frot;
@@ -54,7 +54,7 @@ typedef struct cluster{
   double vrms; 
   double rvir; 
   double rcut; 
-  bool segregate; 
+  float fsegr; 
   double M; 
   double mmean; //Msun
   double trh; 

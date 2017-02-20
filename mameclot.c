@@ -67,7 +67,7 @@ void parameter_use()
   fprintf(stderr,"          -a Osipkov-Merritt anisotropy radius in units of r_0 [999] \n");
   fprintf(stderr,"          -c Cut-off radius in units of r_h [20] \n");
   fprintf(stderr,"          -r Physical scale in pc [1] \n");
-  fprintf(stderr,"          -S Mass segregate with prescription of Baumgardt et al. 2008 [False] \n");
+  fprintf(stderr,"          -S Mass segregation fraction between 0 and 1 (Baumgardt et al. 2008) [0] \n");
   fprintf(stderr,"          -u Upper mass in Msun [100] \n");
   fprintf(stderr,"          -d Distance between 2 clusters in N-body units [20] \n");
   fprintf(stderr,"          -E Dimensionless orbital energy of two-cluster system [0] \n");
@@ -121,8 +121,13 @@ void parameter_check(INPUT *parameters){
   }
 
   // Check segregation -S
-  if ((parameters->segregate)&&(parameters->imftype==0)){
+  if ((parameters->fsegr>0)&&(parameters->imftype==0)){
     fprintf(stderr," *** \n *** Input error: mass function required for segregation \n *** \n");
+    exit (0);
+  }
+
+  if ((parameters->fsegr>1)||(parameters->fsegr<0)){
+    fprintf(stderr," *** \n *** Input error: mass segregation fraction needs to be 0-1 \n *** \n");
     exit (0);
   }
   
@@ -202,7 +207,7 @@ void get_args(int argc, char** argv, INPUT *parameters)
   parameters->eta       = 0.333;  
   parameters->d         = 20;  
   parameters->rcut      = 20;  
-  parameters->segregate = false;  
+  parameters->fsegr     = 0;  
   parameters->Ehat      = 0;  
   parameters->Lhat      = 4;  
   
@@ -244,7 +249,7 @@ void get_args(int argc, char** argv, INPUT *parameters)
 	break;
       case 'r': parameters->rbar = atof(argv[++i]);
 	break;
-      case 'S': parameters->segregate = true;
+      case 'S': parameters->fsegr = atof(argv[++i]);
 	break;
       case 'u': parameters->mup = atof(argv[++i]);
 	break;
@@ -302,7 +307,7 @@ void initialize(SYSTEM **system, INPUT parameters)
   (*system)->clusters[0].vrms = 1.0/sqrt(2.0);
   (*system)->clusters[0].model = parameters.model;
   (*system)->clusters[0].gamma = parameters.gamma;
-  (*system)->clusters[0].segregate = parameters.segregate;
+  (*system)->clusters[0].fsegr = parameters.fsegr;
 
 
   strcpy((*system)->clusters[0].name, parameters.name);
@@ -427,7 +432,7 @@ void initialize(SYSTEM **system, INPUT parameters)
       (*system)->clusters[1].gamma = parameters.gamma;
       (*system)->clusters[1].ra = parameters.ra;
       (*system)->clusters[1].rcut = parameters.rcut;
-      (*system)->clusters[1].segregate = parameters.segregate;
+      (*system)->clusters[1].fsegr = parameters.fsegr;
 
       if ((fabs(parameters.spin)==1)||(parameters.spin==4))
 	(*system)->clusters[1].spin = sign(parameters.spin);
@@ -723,11 +728,9 @@ void get_pos_vel(CLUSTER *cluster)
 	}
     }
 
-
-
   // Add mass segregation following Baumgardt et al. 2008 (Appendix) recipe 
   // !! Implemented Jan 20 2017, some additional testing would be good !!
-  if (cluster->segregate)
+  if (cluster->fsegr>0)
     {
       int Np = 20*cluster->N;
       STAR *temp_stars = calloc(Np, sizeof(STAR)); // TBD: Can be done at start?
@@ -753,16 +756,17 @@ void get_pos_vel(CLUSTER *cluster)
       for (int i=1; i<cluster->N; i++)
 	cmass[i+1] = cmass[i]+ cluster->stars[i].mass/cluster->M;
 
-
       // Pick particles based on energy
       for (int i=0; i<cluster->N; i++)
 	{
-	  idmin = Np*cmass[i];
-	  idmax = Np*cmass[i+1];
-	  int ii = myrandint(idmin, idmax);
-	  temp_stars[ii].mass = cluster->stars[i].mass;
-	  cluster->stars[i] = temp_stars[ii];
-
+	  if (myrand()<cluster->fsegr)
+	    {
+	      idmin = Np*cmass[i];
+	      idmax = Np*cmass[i+1];
+	      int ii = myrandint(idmin, idmax);
+	      temp_stars[ii].mass = cluster->stars[i].mass;
+	      cluster->stars[i] = temp_stars[ii];
+	    }
 	}
 
       free(temp_stars);
@@ -1332,7 +1336,7 @@ void output(SYSTEM *system)
   fprintf(stderr," N clusters = %7i \n",system->Ncl);
   fprintf(stderr," N stars    = %7i \n",system->N);
   
-  if (system->clusters[0].segregate)
+  if (system->clusters[0].fsegr>0)
     fprintf(stderr," Mass segregation following Baumgardt et al. 2008, ApJ, 685, 247\n");
 
   fprintf(stderr,"\n CLUSTER PROPERTIES: \n");
