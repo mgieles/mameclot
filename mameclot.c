@@ -1096,7 +1096,6 @@ void scale(CLUSTER *cluster)
   double vfac = sqrt(cluster->M/rfac);
   cluster->Lz *= rfac*vfac;
   cluster->Krot *= vfac*vfac;
-  fprintf(stderr, " MARK %d \n",cluster->doPhi);
   if (cluster->doPhi){
     int N = (int)cluster->N;
     float *m = (float *)malloc(N*sizeof(float));
