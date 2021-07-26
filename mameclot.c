@@ -67,6 +67,8 @@ void parameter_use()
   fprintf(stderr,"          -a Osipkov-Merritt anisotropy radius in units of r_0 [999] \n");
   fprintf(stderr,"          -c Cut-off radius in units of r_h [20] \n");
   fprintf(stderr,"          -r Physical scale in pc [1] \n");
+  fprintf(stderr,"          -p Print potential [false] \n");
+  fprintf(stderr,"          -P Compute total potential from all pairs (otherwise analytically) [false] \n");
   fprintf(stderr,"          -S Mass segregation fraction between 0 and 1 (Baumgardt et al. 2008) [0] \n");
   fprintf(stderr,"          -u Upper mass in Msun [100] \n");
   fprintf(stderr,"          -d Distance between 2 clusters in N-body units [20] \n");
@@ -86,8 +88,8 @@ void parameter_use()
 
 /*************************************************/
 void parameter_check(INPUT *parameters){
-  char name[5][15] = { "Cored gamma", "Hernquist", "Jaffe", "Isochrone", "Plummer" };
-  double minra[5] = {0.315,1.0/sqrt(24.0),0.023,0.874,0.75};  // Minimum anistropy radius for positive DF
+  char name[6][15] = { "Cored gamma", "Hernquist", "Jaffe", "Isochrone", "Plummer", "Gamma1.5" };
+  double minra[6] = {0.315,1.0/sqrt(24.0),0.023,0.874,0.75, 998};  // Minimum anistropy radius for positive DF
   strcpy(parameters->name, name[4]);
   
   // Check if anisotropy can be applied
@@ -156,8 +158,8 @@ void parameter_check(INPUT *parameters){
   if (parameters->model <= 2)
     parameters->gamma = parameters->model;
   
-  if (parameters->model >= 5){
-    fprintf(stderr," *** \n *** Input error: -m %2i : model must be <= 4\n *** \n",parameters->model);
+  if (parameters->model >= 6){
+    fprintf(stderr," *** \n *** Input error: -m %2i : model must be <= 5\n *** \n",parameters->model);
     exit(0);
   }
   strcpy(parameters->name, name[parameters->model]);
@@ -169,6 +171,11 @@ void parameter_check(INPUT *parameters){
       parameters->N2 = (int)parameters->N*parameters->q/(1.0+parameters->q);
       parameters->N -= parameters->N2;
     }
+  // Check phi computatios
+  if ((!parameters->doPhi)&&(parameters->Ncl==2)){
+      fprintf(stderr," *** \n *** Warning: for binary cluster phi is computed pair-wise \n *** \n");
+      parameters->doPhi=true;
+  }
 
   if (parameters->seed==0)
     parameters->seed = (unsigned) time(NULL);
@@ -196,6 +203,7 @@ void get_args(int argc, char** argv, INPUT *parameters)
   parameters->model     = 3; //  0=Cored gamma-model; 1=Hernquist; 2=Jaffe; 3=Isochrone; 4=Plummer; 
 
   parameters->print_phi = false;
+  parameters->doPhi     = false;
   parameters->spin      = 0;  
   parameters->frot      = 1;  
   parameters->ra        = 999;  
@@ -249,6 +257,8 @@ void get_args(int argc, char** argv, INPUT *parameters)
 	break;
       case 'r': parameters->rbar = atof(argv[++i]);
 	break;
+      case 'P': parameters->doPhi = true;
+	break;
       case 'S': parameters->fsegr = atof(argv[++i]);
 	break;
       case 'u': parameters->mup = atof(argv[++i]);
@@ -300,6 +310,7 @@ void initialize(SYSTEM **system, INPUT parameters)
   (*system)->clusters[0].id = 0;
   (*system)->clusters[0].imftype = parameters.imftype;
   (*system)->clusters[0].print_phi = parameters.print_phi;
+  (*system)->clusters[0].doPhi = parameters.doPhi;
   (*system)->clusters[0].mup = parameters.mup;
   (*system)->clusters[0].rvir = 1.0;
   (*system)->clusters[0].rcut = parameters.rcut;
@@ -414,7 +425,6 @@ void initialize(SYSTEM **system, INPUT parameters)
       double acc = 0.0;
       double tenc = 0.0;
 
-
       if (b<d)
 	{
 	  dx = sqrt(sqr(d) - sqr(b));
@@ -426,6 +436,7 @@ void initialize(SYSTEM **system, INPUT parameters)
       (*system)->clusters[1].N = parameters.N2;
       (*system)->d = parameters.d;
       (*system)->clusters[1].imftype = parameters.imftype;
+      (*system)->clusters[1].doPhi = parameters.doPhi;
       (*system)->clusters[1].mup = parameters.mup;
       (*system)->clusters[1].id = 1;
       (*system)->clusters[1].model = parameters.model;
@@ -525,7 +536,12 @@ void set_scalings(CLUSTER *cluster)
       cluster->rh_over_r0 = 1.0/sqrt(pow(2.0,2.0/3.0)-1.0);
       cluster->rv_over_r0 = 16.0/(3.0*PI);
       break;
-    }
+    case (5):
+      // gamma = 1.5 Dehnen (1993)
+      cluster->rh_over_r0 = 1.0/(pow(2.0,2.0/3.0)-1.0);
+      cluster->rv_over_r0 = 2.0;
+      break;
+}
   cluster->rh_over_rv = cluster->rh_over_r0/cluster->rv_over_r0;
   cluster->rmax_over_r0 = cluster->rcut*cluster->rh_over_r0;
 
@@ -568,7 +584,7 @@ void imf(CLUSTER *cluster)
     case (1):
       // Kroupa (2001) between 0.1 Msun and mup
       // The masses are sampled randomly, but the total mass is 
-      // forced to be the analytical expacted value
+      // forced to be the analytical expected value
       c[0] = pow(0.1,-0.3);
       c[1] = pow(0.5,-0.3);
       c[2] = pow(0.5,-1.3);
@@ -637,7 +653,6 @@ void single_pos_vel(double pos[3], double vel[3], double rmax_over_r0, double ra
   pos[1] = sqrt(r2 - sqr(pos[0]))*cos(TWOPI*a[1]);
   pos[2] = sqrt(r2 - sqr(pos[0]))*sin(TWOPI*a[1]);
       
-      
   // Velocity
   if (ra >= 999){
     // Isotropic 
@@ -703,6 +718,11 @@ void get_analytic_phi(int model, double pos[3], double *phi)
       // Plummer (1911) 
       *phi = -1.0/sqrt(1.0+r2);
       break;
+    case (5): 
+      // gamma = 1.5 (Dehnen 1993) 
+      *phi = -2.0*(1 - sqrt(r/(1.0+r)) );
+      break;
+
     }
 }
 
@@ -848,6 +868,10 @@ double get_r(double rmax_over_r0, int model)
 	  // Plummer (1911) model
 	  r = 1.0/sqrt(pow(a,-2.0/3.0) - 1.0);		
 	  break;
+	case (5):
+	  // gamma = 1.5 Dehnen 1993
+	  r = 1.0/(pow(a,-2.0/3.0) - 1.0);		
+	  break;
 	}
     }
   return r;
@@ -859,7 +883,7 @@ double get_v(double r, int model)
   // Sample velocity from distribution function (DF)
   // Note: energy is defined to be positive: E = -0.5v2 - phi = 0.5*(vesc2 -v2)
 
-  double v, v2, q, q2, E, E2, PE, f1, f2;
+  double v, v2, q, q2, E, E2, E3, PE, f1, f2;
     
   double r2 = sqr(r);
   double f = 1.0 + r;
@@ -875,7 +899,7 @@ double get_v(double r, int model)
       {
       case(0):
 	// Cored gamma=0 (Dehnen 1993)
-	// DF from equation (21) in Tremaine et al. (1993)
+	// DF from equation (21) in Tremaine et al. (1994)
 	vesc2 = 1.0-r2/sqr(f);
 	E = 0.5*vesc2*(1.0-q2);  	
 	PE = sqrt(2.0*E);            
@@ -917,6 +941,20 @@ double get_v(double r, int model)
 	E = 0.5*vesc2*(1.0 - q2);
 	df = pow(E,3.5);
 	gmax = 0.2*pow(1+r2,-2.25);
+	break;
+      case (5):
+	// gamma=1.5 Dehnen (1993) eq A16
+	vesc2 = 4.0*(1 - sqrt(r/f) );
+	E = 0.5*vesc2*(1.0 - q2);
+	E2 = E*E;
+	E3 = E*E2;
+
+	f1 = -9.0/16.0 -99.0/16.0*E + 405.0/8.0*E2 - 3705.0/56.*E3 + 561.0/14.0*E2*E2;
+	f1 += -181.0/14.*E3*E2 + 15.0/7.0*E3*E3 - E3*E3*E/7.0;
+	f1 += 3.0*(3.0+32.0*E-8.0*E2)/(8.0*sqrt(E*(2.0-E)))*asin(sqrt(E/2.0));
+	df = sqrt(E)/pow(2.0-E,4.0)*f1;
+
+	gmax = 0.4*pow(r,-1.75)*pow(1+0.58*pow(r,1.2),-1.75/1.2); 
 	break;
       }
     v2 = vesc2*q2;
@@ -1010,7 +1048,17 @@ void get_osipkov_merrit_v_eta(double r, double ra, int model, double *v, double 
 	df = pow(Q,3.5)*( (1.0 - 1.0/ra2) + (63.0/144.0)*pow(Q,-2.0)/ra2);
 	gmax = 0.22*pow(1+0.3*r2,-2.25);
 	break;
-      }
+
+
+      case (5):
+	// Anisotropic DF: equation A18 Dehnen (1993)
+	//	vesc2 = 2.0/sqrt(1.0+r2);
+	//	Q = 0.5*vesc2*(1.0 - q2 - qt2*r2/ra2);  
+
+	//	df = pow(Q,3.5)*( (1.0 - 1.0/ra2) + (63.0/144.0)*pow(Q,-2.0)/ra2);
+	//	gmax = 0.22*pow(1+0.3*r2,-2.25);
+	break;
+}
     v2 = q2*vesc2;
     g = sin(*eta)*v2*df;
     gmax *= myrand();
@@ -1044,78 +1092,107 @@ void get_q_eta_pair(double p, double *q, double *eta)
 /*************************************************/
 void scale(CLUSTER *cluster)
 {
-  int N = (int)cluster->N;
-  float *m = (float *)malloc(N*sizeof(float));
-  float *x = (float *)malloc(N*sizeof(float));
-  float *y = (float *)malloc(N*sizeof(float));
-  float *z = (float *)malloc(N*sizeof(float));
-  float *phi = (float *)malloc(N*sizeof(float));
-  
   double rfac = cluster->rvir/cluster->rv_over_r0;
   double vfac = sqrt(cluster->M/rfac);
   cluster->Lz *= rfac*vfac;
   cluster->Krot *= vfac*vfac;
+  fprintf(stderr, " MARK %d \n",cluster->doPhi);
+  if (cluster->doPhi){
+    int N = (int)cluster->N;
+    float *m = (float *)malloc(N*sizeof(float));
+    float *x = (float *)malloc(N*sizeof(float));
+    float *y = (float *)malloc(N*sizeof(float));
+    float *z = (float *)malloc(N*sizeof(float));
+    float *phi = (float *)malloc(N*sizeof(float));
+  
 
-  for (int i=0; i<cluster->N; i++)
-    {
-      for (int k=0; k<3; k++){	
-	// Scale to COM pos = vel = 0 and Heggie & Mathieu (1986) N-body units	
-	cluster->stars[i].pos[k] -= cluster->compos[k];
-	cluster->stars[i].vel[k] -= cluster->comvel[k];
-	// Reset COM pos and vel
-	cluster->compos[k] = 0.0;
-	cluster->comvel[k] = 0.0;
-	// Scale to desired r_vir. 
-	cluster->stars[i].pos[k] *= rfac;	
+    for (int i=0; i<cluster->N; i++)
+      {
+	for (int k=0; k<3; k++){	
+ 	  // Scale to COM pos = vel = 0 and Heggie & Mathieu (1986) N-body units	
+	  cluster->stars[i].pos[k] -= cluster->compos[k];
+	  cluster->stars[i].vel[k] -= cluster->comvel[k];
+	  // Reset COM pos and vel
+	  cluster->compos[k] = 0.0;
+	  cluster->comvel[k] = 0.0;
+	  // Scale to desired r_vir. 
+	  cluster->stars[i].pos[k] *= rfac;	
+	  cluster->stars[i].vel[k] *= vfac;
+	}
+	// copy to temp arrays for potential calculation on GPU
+	m[i] = cluster->stars[i].mass;
+	x[i] = cluster->stars[i].pos[0];
+	y[i] = cluster->stars[i].pos[1];
+	z[i] = cluster->stars[i].pos[2];
+	phi[i] = 0.0; 
+      }
+    // This function is executed on the CPU (defined in pot.c) or GPU (defined in gpupot.cu)
+    calculate_potential(m, x, y, z, phi, N, 0);
+
+    for (int i=0; i<cluster->N; i++){
+      cluster->stars[i].phi = phi[i];
+      for (int k=0; k<3; k++){
+	cluster->K += 0.5*cluster->stars[i].mass*sqr(cluster->stars[i].vel[k]);
+      }
+    cluster->W += 0.5*cluster->stars[i].mass*cluster->stars[i].phi;
+    }
+    
+    rfac = -cluster->W/(cluster->M*sqr(cluster->vrms));
+    vfac = sqrt(0.5*cluster->M*sqr(cluster->vrms)/cluster->K);
+    cluster->Lz *= rfac*vfac;
+    cluster->Krot *= vfac*vfac;
+    
+    for (int i=0; i<cluster->N; i++){
+      for (int k=0; k<3; k++){
+	cluster->stars[i].pos[k] *= rfac;
 	cluster->stars[i].vel[k] *= vfac;
       }
-      // copy to temp arrays for potential calculation on GPU
-      m[i] = cluster->stars[i].mass;
-      x[i] = cluster->stars[i].pos[0];
-      y[i] = cluster->stars[i].pos[1];
-      z[i] = cluster->stars[i].pos[2];
-      phi[i] = 0.0; 
-  }
-  
-  // This function is executed on the CPU (defined in pot.c) or GPU (defined in gpupot.cu)
-  calculate_potential(m, x, y, z, phi, N, 0);
-
-  for (int i=0; i<cluster->N; i++){
-    cluster->stars[i].phi = phi[i];
-    for (int k=0; k<3; k++){
-      cluster->K += 0.5*cluster->stars[i].mass*sqr(cluster->stars[i].vel[k]);
     }
-    cluster->W += 0.5*cluster->stars[i].mass*cluster->stars[i].phi;
+    
+    fprintf(stderr," Scale factor cluster %1i: pos = %8.5f; vel = %8.5f \n", 
+	    cluster->id,rfac,vfac);
+    
+    cluster->W = -cluster->M*sqr(cluster->vrms);
+    cluster->K = 0.5*cluster->M*sqr(cluster->vrms);
+    
+    cluster->E = cluster->K + cluster->W;
+    cluster->lambda = cluster->Lz*sqrt(-cluster->E)/pow(cluster->M,2.5);
+    
+    free(m);
+    free(x);
+    free(y);
+    free(z);
+    free(phi);
   }
+  else{
+    // 26 July 2021: compute phi and energy from analytic potential
+    for (int i=0; i<cluster->N; i++)
+      {
+	get_analytic_phi(cluster->model, cluster->stars[i].pos, &cluster->stars[i].phi);
+	//	fprintf(stderr," test %10.5f \n",cluster->stars[i].phi);
 
-
-
-  rfac = -cluster->W/(cluster->M*sqr(cluster->vrms));
-  vfac = sqrt(0.5*cluster->M*sqr(cluster->vrms)/cluster->K);
-  cluster->Lz *= rfac*vfac;
-  cluster->Krot *= vfac*vfac;
-
-  for (int i=0; i<cluster->N; i++){
-    for (int k=0; k<3; k++){
-      cluster->stars[i].pos[k] *= rfac;
-      cluster->stars[i].vel[k] *= vfac;
+	cluster->stars[i].phi *= vfac*vfac;
+	for (int k=0; k<3; k++){	
+	  // Scale to COM pos = vel = 0 and Heggie & Mathieu (1986) N-body units	
+	  cluster->stars[i].pos[k] -= cluster->compos[k];
+	  cluster->stars[i].vel[k] -= cluster->comvel[k];
+	  // Reset COM pos and vel
+	  cluster->compos[k] = 0.0;
+	  cluster->comvel[k] = 0.0;
+	  // Scale to desired r_vir. 
+	  cluster->stars[i].pos[k] *= rfac;	
+	  cluster->stars[i].vel[k] *= vfac;
+	}
+      }
+    for (int i=0; i<cluster->N; i++){
+      for (int k=0; k<3; k++){
+	cluster->K += 0.5*cluster->stars[i].mass*sqr(cluster->stars[i].vel[k]);
+      }
+      cluster->W += 0.5*cluster->stars[i].mass*cluster->stars[i].phi;
     }
+    cluster->E = cluster->K + cluster->W;
+    cluster->lambda = cluster->Lz*sqrt(-cluster->E)/pow(cluster->M,2.5);
   }
-
-  fprintf(stderr," Scale factor cluster %1i: pos = %8.5f; vel = %8.5f \n", 
-  	  cluster->id,rfac,vfac);
-
-  cluster->W = -cluster->M*sqr(cluster->vrms);
-  cluster->K = 0.5*cluster->M*sqr(cluster->vrms);
-
-  cluster->E = cluster->K + cluster->W;
-  cluster->lambda = cluster->Lz*sqrt(-cluster->E)/pow(cluster->M,2.5);
-
-  free(m);
-  free(x);
-  free(y);
-  free(z);
-  free(phi);
 }
 
 /*************************************************/
@@ -1346,9 +1423,9 @@ void output(SYSTEM *system)
       double r_h = cluster->rvir*cluster->rh_over_rv;
       double rho_h = 3.0*cluster->M/(8.0*PI*cube(r_h));
 
-      fprintf(stderr," #%i: %7s: rv/r0=%5.3f; rh/r0=%5.3f; rh/rv=%5.3f; rcut/rh=%3.1f; ra/r0=%3.1f\n",i+1, 
+      fprintf(stderr," #%i: %7s: rv/r0=%5.3f; rh/r0=%5.3f; rh/rv=%5.3f; rcut/rh=%3.1f; ra/r0=%3.1f; f_seg=%3.2f\n",i+1, 
 	      cluster->name,cluster->rv_over_r0,cluster->rh_over_r0,cluster->rh_over_rv,
-	      cluster->rcut,cluster->ra);
+	      cluster->rcut,cluster->ra,cluster->fsegr);
 	      
       fprintf(stderr,"     N          = %11i \n",cluster->N); 
       fprintf(stderr,"     M          = %11.3f / %11.3f Msun\n",cluster->M,cluster->M * system->mstar);
